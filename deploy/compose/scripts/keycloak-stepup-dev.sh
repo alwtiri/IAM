@@ -17,7 +17,8 @@ REALM="${REALM:-iam}"
 FLOW="iam-browser"
 
 kc() { # run kcadm inside the keycloak container
-  docker compose exec -T keycloak /opt/keycloak/bin/kcadm.sh "$@" --config /tmp/kcadm.config
+  # </dev/null: `docker compose exec` would otherwise swallow the stdin of the surrounding while-read loop
+  docker compose exec -T keycloak /opt/keycloak/bin/kcadm.sh "$@" --config /tmp/kcadm.config </dev/null
 }
 
 docker compose exec -T keycloak bash -c \
@@ -35,7 +36,7 @@ fi
 kc get "authentication/flows/$FLOW/executions" -r "$REALM" > /tmp/iam-flow-executions.json
 python3 - "$REALM" <<'PY' > /tmp/iam-flow-plan.txt
 import json, sys
-wanted = {"auth-username-password-form": "pwd", "auth-otp-form": "otp"}
+wanted = {"auth-username-password-form": "pwd", "auth-otp-form": "otp", "webauthn-authenticator": "hwk"}
 for e in json.load(open("/tmp/iam-flow-executions.json")):
     ref = wanted.get(e.get("providerId"))
     if ref and not e.get("authenticationConfig"):
