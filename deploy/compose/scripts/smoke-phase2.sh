@@ -8,13 +8,20 @@
 #   3. Immediately run:
 #        IAM_SESSION=... XSRF=... ./scripts/smoke-phase2.sh            # functional checks
 #        IAM_SESSION=... XSRF=... ./scripts/smoke-phase2.sh --vault-down  # + Vault outage check (stops/unseals Vault)
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  echo "Run this script, do not source it:  IAM_SESSION='...' XSRF='...' ./scripts/smoke-phase2.sh" >&2
+  return 1
+fi
 set -uo pipefail
 
 BASE="${BASE:-$(grep -E '^IAM_PUBLIC_URL=' .env 2>/dev/null | cut -d= -f2-)}"
 BASE="${BASE:-http://127.0.0.1:8088}"
 MAILPIT="${MAILPIT:-http://127.0.0.1:${IAM_MAILPIT_PORT:-8025}}"
-: "${IAM_SESSION:?set IAM_SESSION (browser cookie)}"
-: "${XSRF:?set XSRF (XSRF-TOKEN browser cookie)}"
+if [ -z "${IAM_SESSION:-}" ] || [ -z "${XSRF:-}" ]; then
+  echo "Missing cookies. Log in at $BASE/oauth2/authorization/keycloak?stepup=1, copy IAM_SESSION and XSRF-TOKEN, then run:" >&2
+  echo "  IAM_SESSION='...' XSRF='...' ./scripts/smoke-phase2.sh" >&2
+  exit 2
+fi
 VAULT_DOWN=0; [ "${1:-}" = "--vault-down" ] && VAULT_DOWN=1
 
 TS="$(date +%s)"; PASS=0; FAIL=0
