@@ -23,6 +23,8 @@ spring:
     clean-disabled: true
     validate-on-migrate: true
     out-of-order: false
+    default-schema: platform
+    create-schemas: true
   mvc:
     problemdetails:
       enabled: false
