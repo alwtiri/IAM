@@ -102,6 +102,7 @@ class SecurityConfiguration {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health/liveness", "/actuator/health/readiness", "/actuator/prometheus").permitAll()
                 .requestMatchers("/oauth2/**", "/login/**").permitAll()
+                .requestMatchers("/error").permitAll() // error rendering only; content is the §73 model, never stack traces
                 .requestMatchers(api).authenticated()
                 .requestMatchers("/logout").authenticated()
                 .anyRequest().denyAll())

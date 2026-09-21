@@ -62,6 +62,19 @@ npx @redocly/cli lint contracts/openapi/iam-core-v1.yaml
 `docker compose down` keeps data. `docker compose down -v` deletes **all** data (database, Vault, Keycloak) — only for
 development, and Vault must then be initialised again.
 
+## Pushing changes
+
+`./scripts/git-push.sh "message" [branch]` stages everything, aborts if a secret file (`deploy/compose/secrets/*`, `.env`, keys, `vault-dev-init.json`) is staged, commits, pushes the branch, and prints the pull-request link. Direct pushes to `main` are refused unless `ALLOW_MAIN=1`.
+
+## Phase 2 smoke test (gate condition C2)
+
+Log in with step-up (`$IAM_PUBLIC_URL/oauth2/authorization/keycloak?stepup=1`), copy the `IAM_SESSION` and `XSRF-TOKEN` cookies, and within 5 minutes run from `deploy/compose`:
+
+```bash
+IAM_SESSION=... XSRF=... ./scripts/smoke-phase2.sh              # functional, negative, audit, secret-leak, e-mail checks
+IAM_SESSION=... XSRF=... ./scripts/smoke-phase2.sh --vault-down # also stops Vault, checks 503 SECRETS_UNAVAILABLE, unseals it again
+```
+
 ## Rules for contributors
 
 1. Never commit secrets; `.gitignore` and Gitleaks enforce this. Use `deploy/compose/secrets/` locally.
