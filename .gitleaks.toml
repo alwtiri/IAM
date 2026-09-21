@@ -1,0 +1,9 @@
+# Gitleaks configuration: default rules plus allow-list for documentation placeholders.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Template file without secret values"
+paths = [
+  '''deploy/compose/\.env\.example''',
+]

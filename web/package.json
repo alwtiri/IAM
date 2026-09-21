@@ -1,0 +1,41 @@
+{
+  "name": "iam-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Enterprise IAM / PAM Platform — web UI (Phase 1 skeleton)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --noEmit",
+    "test": "vitest run",
+    "lint": "tsc -b --noEmit"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@emotion/cache": "^11.14.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/material": "^7.3.11",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router": "^7.18.4",
+    "stylis": "^4.4.0",
+    "stylis-plugin-rtl": "^2.1.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/stylis": "^4.2.7",
+    "@vitejs/plugin-react": "^5.2.0",
+    "jsdom": "^30.1.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6",
+    "vitest": "^3.2.7"
+  },
+  "packageManager": "pnpm@10.28.0"
+}

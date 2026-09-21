@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iam.example.internal/contracts/messaging/operation-result.schema.json",
+  "title": "OperationResult v1",
+  "description": "Message published by worker pools to exchange iam.ops.results. The Core consumer is idempotent on messageId and updates the Operation; workers never write the platform database.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "messageId", "operationId", "attempt", "outcome", "workerInstance", "correlationId", "completedAt"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "messageId": { "type": "string", "format": "uuid" },
+    "operationId": { "type": "string", "format": "uuid" },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "outcome": { "type": "string", "enum": ["SUCCEEDED", "FAILED", "PARTIAL", "TIMEOUT", "UNKNOWN", "UNSUPPORTED"] },
+    "verification": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["mode", "verifiedAt", "summary"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["READ_BACK", "LOGIN_TEST", "TARGET_CONFIRMATION"] },
+        "verifiedAt": { "type": "string", "format": "date-time" },
+        "summary": { "type": "string", "maxLength": 512 }
+      }
+    },
+    "error": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["code", "message", "retryable", "changeMayHaveApplied"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string", "maxLength": 1000 },
+        "retryable": { "type": "boolean" },
+        "changeMayHaveApplied": { "type": "boolean" }
+      }
+    },
+    "details": { "type": "array", "items": { "type": "string" } },
+    "resultPayload": { "type": ["object", "null"], "description": "Non-secret result data (observed account state, discovery page reference, drift list)." },
+    "workerInstance": { "type": "string" },
+    "correlationId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{8,64}$" },
+    "completedAt": { "type": "string", "format": "date-time" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "outcome": { "const": "SUCCEEDED" } } },
+      "then": { "properties": { "error": { "type": "null" } } },
+      "else": { "required": ["error"], "properties": { "error": { "type": "object" } } }
+    }
+  ]
+}

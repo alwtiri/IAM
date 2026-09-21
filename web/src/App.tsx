@@ -1,0 +1,78 @@
+import { useEffect, useMemo, useState } from 'react';
+import { BrowserRouter, MemoryRouter, Route, Routes } from 'react-router';
+import { Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
+import { DirectionalTheme } from './theme';
+import { directionOf, messages, type Locale } from './i18n/messages';
+import { LocaleContext } from './i18n/LocaleContext';
+import { ApiError, apiFetch, startLogin } from './api/client';
+import type { EffectiveAccess } from './api/types';
+import { Shell } from './layout/Shell';
+import { flatten, isAvailable, type NavItem } from './navigation';
+import { AuditPage, HealthPage, PlannedPage, ProvidersPage, RolesPage, TargetsPage, UsersPage } from './pages/Pages';
+import { ErrorAlert } from './pages/common';
+
+const PAGES: Record<string, () => React.JSX.Element> = {
+  dashboard: HealthPage,
+  systemHealth: HealthPage,
+  users: UsersPage,
+  roles: RolesPage,
+  rolesPermissions: RolesPage,
+  auditLogs: AuditPage,
+  allTargets: TargetsPage,
+  providerManagement: ProvidersPage,
+};
+
+function routeElement(item: NavItem) {
+  const Page = PAGES[item.id];
+  return isAvailable(item) && Page ? <Page /> : <PlannedPage item={item} />;
+}
+
+export function App({ initialLocale = 'en', inMemoryRouter = false }: { initialLocale?: Locale; inMemoryRouter?: boolean }) {
+  const [locale, setLocale] = useState<Locale>(initialLocale);
+  const [me, setMe] = useState<EffectiveAccess>();
+  const [error, setError] = useState<unknown>();
+  const t = messages[locale];
+  const direction = directionOf(locale);
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+    document.documentElement.dir = direction;
+  }, [locale, direction]);
+
+  useEffect(() => {
+    apiFetch<EffectiveAccess>('/api/v1/me').then(setMe, setError);
+  }, []);
+
+  const ctx = useMemo(() => ({ locale, t, toggle: () => setLocale(locale === 'en' ? 'ar' : 'en') }), [locale, t]);
+  const Router = inMemoryRouter ? MemoryRouter : BrowserRouter;
+
+  let content: React.JSX.Element;
+  if (error && !(error instanceof ApiError && error.status === 401)) {
+    content = <Box sx={{ p: 4 }}><ErrorAlert error={error} /></Box>;
+  } else if (!me) {
+    content = (
+      <Stack sx={{ p: 6 }} spacing={2} alignItems="flex-start">
+        <Typography variant="h4" component="h1">{t.appTitle}</Typography>
+        <Typography color="text.secondary">{t.appSubtitle}</Typography>
+        {error ? <Button variant="contained" onClick={() => startLogin()}>{t.signIn}</Button> : <CircularProgress aria-label={t.loading} />}
+      </Stack>
+    );
+  } else {
+    content = (
+      <Shell me={me}>
+        <Routes>
+          {flatten().filter((i) => !i.children).map((i) => <Route key={i.id} path={i.path} element={routeElement(i)} />)}
+          <Route path="*" element={<HealthPage />} />
+        </Routes>
+      </Shell>
+    );
+  }
+
+  return (
+    <LocaleContext.Provider value={ctx}>
+      <DirectionalTheme direction={direction}>
+        <Router>{content}</Router>
+      </DirectionalTheme>
+    </LocaleContext.Provider>
+  );
+}
