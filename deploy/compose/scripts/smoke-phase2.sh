@@ -41,6 +41,11 @@ echo "1. Session"
 call GET /api/v1/me; expect 200 "GET /me"
 [ "$CODE" = 200 ] || { echo "Session cookie invalid or expired - log in again and copy fresh cookies."; exit 1; }
 echo "     actor: $(jget "d.get('displayName') or d.get('username') or d")"
+AGE="$(jget "int(__import__('time').time() - __import__('calendar').timegm(__import__('time').strptime(d['authenticatedAt'][:19], '%Y-%m-%dT%H:%M:%S')))")"
+echo "     acr: $(jget "d.get('authenticationContext')")   authenticated ${AGE:-?}s ago"
+if [ -n "$AGE" ] && [ "$AGE" -gt 300 ]; then
+  echo "     WARNING: login is older than 5 minutes - step-up checks will fail. Sign in again with ?stepup=1."
+fi
 
 echo "2. Organization / person / identity"
 call POST /api/v1/org-units "{\"kind\":\"DEPARTMENT\",\"code\":\"SMOKE-$TS\",\"name\":\"Smoke $TS\"}"
@@ -58,7 +63,7 @@ expect "200|204" "activate identity (lifecycle e-mail queued)"
 echo "3. Scoped role grant (step-up)"
 call POST /api/v1/role-assignments "{\"identityId\":\"$IDENT\",\"roleId\":\"00000000-0000-7000-8000-000000000107\",\"scope\":[{\"type\":\"ORG_UNIT\",\"value\":\"$OU\"}],\"reason\":\"smoke test\"}"
 if grep -q STEP_UP_REQUIRED "$BODY"; then
-  bad "grant HELPDESK scoped to org unit: STEP_UP_REQUIRED - login older than 5 min; redo step 1"
+  bad "grant HELPDESK scoped to org unit: STEP_UP_REQUIRED - login older than 5 min, or MFA not reported by Keycloak (run ./scripts/keycloak-stepup-dev.sh once)"
 else
   expect 201 "grant HELPDESK scoped to ORG_UNIT"; GRANT="$(jget "d['id']")"
   call POST /api/v1/role-assignments "{\"identityId\":\"$IDENT\",\"roleId\":\"00000000-0000-7000-8000-000000000107\",\"scope\":[{\"type\":\"ORG_UNIT\",\"value\":\"$OU\"}]}"

@@ -32,6 +32,7 @@ cp .env.example .env                 # adjust IAM_PUBLIC_URL / IAM_BIND_ADDRESS 
 ./scripts/generate-dev-secrets.sh    # random dev secrets into ./secrets (git-ignored)
 docker compose up -d --build
 ./scripts/vault-init-dev.sh          # initialise/unseal Vault, KV 'iam/', AppRole for iam-core
+./scripts/keycloak-stepup-dev.sh     # tag password/OTP with amr so step-up (MFA) is recognised
 docker compose ps                    # all services healthy
 ```
 
