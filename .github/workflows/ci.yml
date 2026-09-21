@@ -70,7 +70,9 @@ jobs:
       - name: Lint OpenAPI contract
         run: npx --yes @redocly/cli@1 lint contracts/openapi/iam-core-v1.yaml
       - name: Java ↔ contract enum sync
-        run: python3 ci/check-contract-sync.py
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 ci/check-contract-sync.py
       - name: Compose hardening policy
         run: |
           cd deploy/compose

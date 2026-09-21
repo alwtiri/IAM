@@ -6,8 +6,9 @@ Enterprise IAM / PAM Platform — Enterprise Identity, Access, Governance &amp; 
 | Phase | State |
 |---|---|
 | 0 — Discovery & Assessment | **Approved** (2026-09-21) — [report](docs/phase-0/PHASE-0-REPORT.md) incl. gate clarifications (Addendum G) |
-| 1 — Architecture & Domain Model | **Awaiting gate approval** — [gate report](docs/phase-1/PHASE-1-GATE-REPORT.md) |
-| 2 … 12 | Not started (each requires explicit authorization) |
+| 1 — Architecture & Domain Model | **Approved** (2026-09-21) — [gate report](docs/phase-1/PHASE-1-GATE-REPORT.md); runs on the owner's server |
+| 2 — IAM Foundation | **Awaiting gate approval** — [design](docs/phase-2/PHASE-2-DESIGN.md) · [gate report](docs/phase-2/PHASE-2-GATE-REPORT.md) |
+| 3 … 12 | Not started (each requires explicit authorization) |
 
 ## Where to start
 

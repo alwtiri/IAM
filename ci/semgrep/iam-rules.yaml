@@ -6,13 +6,10 @@ rules:
     message: >-
       Secret.reveal() exposes secret material. Allowed only in provider/worker credential use and the secrets
       broker. Add a justification comment and ensure the copy is cleared.
-    patterns:
-      - pattern: $S.reveal()
-      - pattern-not-inside: |
-          // semgrep-justified: $REASON
-          ...
+    pattern: $S.reveal()
     paths:
-      exclude: ["**/src/test/**", "shared-kernel/**"]
+      # Allowed only in the secrets broker (Vault client) and, from Phase 3, provider/worker credential use.
+      exclude: ["**/src/test/**", "shared-kernel/**", "core/src/main/java/com/enterprise/iam/core/secrets/**", "providers/**", "worker/**"]
 
   - id: iam-no-secret-logging
     languages: [java]

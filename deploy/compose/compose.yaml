@@ -34,7 +34,9 @@ services:
     image: nginxinc/nginx-unprivileged:1.27.3-alpine
     user: "101:101"
     ports:
-      - "127.0.0.1:${IAM_HTTP_PORT:-8088}:8080"   # dev: localhost only; TLS is terminated here in compose.prod.yaml
+      # Bind address: 127.0.0.1 (default, local only) or 0.0.0.0 / a server IP to allow access from the LAN.
+      # TLS is terminated here in compose.prod.yaml.
+      - "${IAM_BIND_ADDRESS:-127.0.0.1}:${IAM_HTTP_PORT:-8088}:8080"
     volumes:
       - ./proxy/default.conf:/etc/nginx/conf.d/default.conf:ro
     tmpfs:
@@ -72,13 +74,31 @@ services:
       IAM_DB_URL: jdbc:postgresql://postgres:5432/iam
       IAM_DB_USER: iam_app
       IAM_DB_MIGRATION_USER: iam_owner
-      # Secret values are read from /run/secrets via Spring's configtree (file name = property name).
-      SPRING_CONFIG_IMPORT: "optional:configtree:/run/secrets/"
+      IAM_HTTP_BASE: ${IAM_PUBLIC_URL:-http://localhost:8088}
+      IAM_AUTH_ISSUER: ${IAM_PUBLIC_URL:-http://localhost:8088}/auth/realms/iam
+      IAM_AUTH_AUTHORIZATION_URI: ${IAM_PUBLIC_URL:-http://localhost:8088}/auth/realms/iam/protocol/openid-connect/auth
+      IAM_AUTH_END_SESSION_URI: ${IAM_PUBLIC_URL:-http://localhost:8088}/auth/realms/iam/protocol/openid-connect/logout
+      IAM_AUTH_POST_LOGOUT_URI: ${IAM_PUBLIC_URL:-http://localhost:8088}/
+      # Keycloak user id of the first administrator (seeded 'iam-admin' user of the dev realm). Used once.
+      IAM_BOOTSTRAP_ADMIN_SUBJECT: ${IAM_BOOTSTRAP_ADMIN_SUBJECT:-4f0a6d3e-8c1b-4d2a-9e5f-1a2b3c4d5e6f}
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: "1025"
+    # Secret values are read from /run/secrets via Spring's configtree (file name = property name).
     secrets:
       - source: iam_app_password
         target: spring.datasource.password
       - source: iam_owner_password
         target: spring.flyway.password
+      - source: rabbitmq_password
+        target: spring.rabbitmq.password
+      - source: keycloak_client_secret
+        target: iam.auth.client-secret
+      - source: vault_role_id
+        target: vault_role_id
+      - source: vault_secret_id
+        target: vault_secret_id
+      - source: cache_password
+        target: cache_password
     depends_on:
       postgres: { condition: service_healthy }
     networks: [edge, core]
@@ -150,8 +170,11 @@ services:
     command:
       - >-
         export KC_DB_PASSWORD="$$(cat /run/secrets/keycloak_db_password)"
-        KC_BOOTSTRAP_ADMIN_PASSWORD="$$(cat /run/secrets/keycloak_admin_password)" &&
-        exec /opt/keycloak/bin/kc.sh start-dev
+        KC_BOOTSTRAP_ADMIN_PASSWORD="$$(cat /run/secrets/keycloak_admin_password)"
+        IAM_CLIENT_SECRET="$$(cat /run/secrets/keycloak_client_secret)"
+        IAM_ADMIN_INITIAL_PASSWORD="$$(cat /run/secrets/iam_admin_initial_password)"
+        IAM_PUBLIC_URL="${IAM_PUBLIC_URL:-http://localhost:8088}" &&
+        exec /opt/keycloak/bin/kc.sh start-dev --import-realm
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
@@ -159,9 +182,11 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: kcadmin
       KC_HTTP_RELATIVE_PATH: /auth
       KC_PROXY_HEADERS: xforwarded
-      KC_HOSTNAME: http://localhost:${IAM_HTTP_PORT:-8088}/auth
+      KC_HOSTNAME: ${IAM_PUBLIC_URL:-http://localhost:8088}/auth
       KC_HEALTH_ENABLED: "true"
-    secrets: [keycloak_db_password, keycloak_admin_password]
+    secrets: [keycloak_db_password, keycloak_admin_password, keycloak_client_secret, iam_admin_initial_password]
+    volumes:
+      - ./keycloak/realm-iam-dev.json:/opt/keycloak/data/import/realm-iam-dev.json:ro
     depends_on:
       keycloak-db: { condition: service_healthy }
     networks: [edge, core]
@@ -231,6 +256,16 @@ services:
       timeout: 3s
       retries: 5
 
+  mailpit:
+    <<: [*hardening, *logging]
+    # Development SMTP sink: every e-mail the platform sends is visible at http://localhost:8025 (never used in production).
+    image: axllent/mailpit:v1.20.0
+    user: "1000:1000"
+    ports:
+      - "${IAM_BIND_ADDRESS:-127.0.0.1}:${IAM_MAILPIT_PORT:-8025}:8025"
+    networks: [core]
+    mem_limit: 128m
+
 networks:
   edge: {}
   core:
@@ -253,3 +288,7 @@ secrets:
   keycloak_admin_password: { file: ./secrets/keycloak_admin_password }
   rabbitmq_password:       { file: ./secrets/rabbitmq_password }
   cache_password:          { file: ./secrets/cache_password }
+  keycloak_client_secret:  { file: ./secrets/keycloak_client_secret }
+  iam_admin_initial_password: { file: ./secrets/iam_admin_initial_password }
+  vault_role_id:           { file: ./secrets/vault_role_id }
+  vault_secret_id:         { file: ./secrets/vault_secret_id }

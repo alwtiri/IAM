@@ -56,7 +56,7 @@ Boundary rules: Zone 0 reaches only Zone 1. Zone 4 reaches Zone 2 only through `
 | Worker / gateway / scheduler | mTLS client certificate from Vault PKI (per instance, ≤ 72 h validity, auto-renewed) + component registration in Core | Certificate subject bound to registered component; revocation list checked |
 | Agent | mTLS with enrolment approval (§17) | Per-host certificate; revocable |
 
-Session security: BFF cookie `__Host-iam_session`, HttpOnly, Secure, SameSite=Strict; idle timeout 15 min, absolute 8 h (configurable); CSRF synchronizer token for state-changing requests; session fixation protection; concurrent session limit per user; logout revokes the Keycloak session and the platform session.
+Session security: BFF cookie (`__Host-iam_session` with TLS in production, `IAM_SESSION` in HTTP development), HttpOnly, Secure (production), SameSite=Lax for the session cookie (the OIDC redirect back from Keycloak is a top-level navigation) and SameSite=Strict for the CSRF cookie; idle timeout 15 min, absolute 8 h (configurable); CSRF synchronizer token for state-changing requests; session fixation protection; concurrent session limit per user; logout revokes the Keycloak session and the platform session.
 
 Step-up matrix (initial): approve/reject requests, reveal/checkout secrets, start HIGH/CRITICAL-risk sessions, emergency access, role/permission/policy/SoD changes, security settings, audit export → require `acr` ≥ `mfa` with authentication age ≤ 5 min.
 

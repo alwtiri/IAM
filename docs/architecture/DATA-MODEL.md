@@ -15,7 +15,7 @@
 6. **No secret values in any table.** Columns holding Vault references are named `*_secret_ref` and contain `vault:<mount>/<path>#<version>`.
 7. JSONB only for genuinely open-ended data (provider response metadata, policy conditions, capability snapshots) — never for fields used in authorization filters, which must be real columns with indexes.
 8. Every foreign key column is indexed; list queries have supporting composite indexes (org unit + status, target + status, etc.).
-9. Migrations: Flyway, forward-only, `V<yyyyMMddHHmm>__<module>_<description>.sql` from Phase 2 onward (V1 is the baseline); expand-and-contract for breaking changes; no `DROP`/`TRUNCATE` of data-bearing objects without an approved data-migration ADR.
+9. Migrations: Flyway, forward-only, sequential `V<n>__<description>.sql` (one reviewer-visible sequence; conflicts are resolved at merge time), history table in schema `platform`; expand-and-contract for breaking changes; no `DROP`/`TRUNCATE` of data-bearing objects without an approved data-migration ADR.
 10. Database roles: `iam_owner` (migrations only), `iam_app` (DML on module schemas; **INSERT/SELECT only** on `audit`), `iam_readonly` (reporting). The application never connects as owner.
 
 ## 2. Tables by schema (key columns)
@@ -33,8 +33,8 @@
 ### authorization
 - `permission (code PK, resource, action, description, sensitive boolean)`
 - `role (id, code UNIQUE, name, built_in boolean, description)` · `role_permission (role_id, permission_code) PK both`
-- `role_assignment (id, identity_id, role_id, scope_id, source, valid_from, valid_until, granted_by_request_id NULL)`
-- `scope (id, kind, is_global boolean)` · `scope_element (scope_id, element_type CHECK in (ORG_UNIT, ORG_UNIT_TREE, ENVIRONMENT, PROVIDER_TYPE, PROVIDER_INSTANCE, TARGET, TARGET_GROUP), element_value)`
+- `role_assignment (id, identity_id, role_id, source, status, scope_key, valid_from, valid_until, granted_by, granted_at, revoked_by, revoked_at, reason, version)` — partial unique index on `(identity_id, role_id, scope_key) WHERE status='ACTIVE'`; CHECK `granted_by <> identity_id` (no self-grant)
+- `role_assignment_scope (assignment_id, element_type CHECK in (GLOBAL, ORG_UNIT, ORG_UNIT_TREE, ENVIRONMENT, PROVIDER_TYPE, PROVIDER_INSTANCE, TARGET), element_value)` — implemented in Phase 2 (replaces the separate `scope`/`scope_element` design; TARGET_GROUP deferred until target groups exist)
 
 ### policy / risk / sod
 - `policy (id, key, version, status CHECK in (DRAFT, PUBLISHED, RETIRED), applies_to jsonb, conditions jsonb, effect, obligations jsonb, published_at, published_by)` — `UNIQUE(key, version)`; trigger prevents updates to PUBLISHED rows.
@@ -44,7 +44,7 @@
 
 ### target / provider
 - `target (id, name, hostname, ip inet, dns_name, type, platform, os, environment, criticality, classification, owner_identity_id, technical_owner_identity_id, business_owner_identity_id, location_id, status, discovery_state, reconciliation_state, health, tags text[])` — indexes on `(type, environment)`, `hostname`, GIN on `tags`.
-- `target_provider_binding (target_id, provider_instance_id, channel)` · `dependency (id, from_target_id, to_target_id, type)` · `license_contract (id, product, vendor, license_ref, contract_ref, expires_on, support_status, owner_identity_id, renewal_date)`
+- `provider.target_binding (target_id, provider_instance_id, channel)` (owned by the provider module, which may depend on target) · `dependency (id, from_target_id, to_target_id, type)` · `license_contract (id, product, vendor, license_ref, contract_ref, expires_on, support_status, owner_identity_id, renewal_date)`
 - `provider_instance (id, type, name UNIQUE, version, endpoint, config jsonb /* no secrets */, credential_secret_ref, enabled, health, circuit_state, last_health_at, failure_reason)`
 - `capability_snapshot (target_id, capability, status CHECK in (SUPPORTED, UNSUPPORTED, UNAVAILABLE, DEGRADED, AGENT_REQUIRED), reason, since)` PK `(target_id, capability)`
 - `agent (id, host, target_id, version, os, status CHECK(8 states), certificate_serial, capabilities text[], policy_bundle_version, last_seen_at)` · `gateway (id, channel, instance_id UNIQUE, version, certificate_serial, health, last_seen_at)`
@@ -78,7 +78,8 @@
 
 | Migration set | Phase |
 |---|---|
-| `V1__baseline` — module schemas, roles guidance, extensions | 1 (this phase) |
+| `V1__baseline` — module schemas, role grants | 1 |
+| `V2`–`V8` — audit, operation/outbox, organization, identity, authorization (+seed), target/provider registry, notification | 2 (implemented) |
 | organization, identity, authorization, audit, operation/outbox, notification, provider registry, target metadata | 2 |
 | account, entitlement, credential (metadata), capability snapshot | 3 |
 | policy engine tables, risk, sod, request, approval, grant, reviews | 4 |

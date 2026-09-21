@@ -1,0 +1,82 @@
+{
+  "realm": "iam",
+  "displayName": "Enterprise IAM / PAM (development)",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "loginWithEmailAllowed": false,
+  "bruteForceProtected": true,
+  "failureFactor": 5,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "passwordPolicy": "length(12) and notUsername and notEmail and passwordHistory(5)",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 900,
+  "ssoSessionMaxLifespan": 28800,
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA256",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "webAuthnPolicyPasswordlessUserVerificationRequirement": "required",
+  "attributes": {
+    "acr.loa.map": "{\"basic\":\"1\",\"mfa\":\"2\"}"
+  },
+  "requiredActions": [
+    { "alias": "CONFIGURE_TOTP", "name": "Configure OTP", "providerId": "CONFIGURE_TOTP", "enabled": true, "defaultAction": true, "priority": 10 },
+    { "alias": "UPDATE_PASSWORD", "name": "Update Password", "providerId": "UPDATE_PASSWORD", "enabled": true, "defaultAction": false, "priority": 20 },
+    { "alias": "webauthn-register", "name": "Webauthn Register", "providerId": "webauthn-register", "enabled": true, "defaultAction": false, "priority": 30 },
+    { "alias": "webauthn-register-passwordless", "name": "Webauthn Register Passwordless", "providerId": "webauthn-register-passwordless", "enabled": true, "defaultAction": false, "priority": 40 }
+  ],
+  "clients": [
+    {
+      "clientId": "iam-core",
+      "name": "IAM Core (BFF)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${IAM_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["${IAM_PUBLIC_URL}/login/oauth2/code/keycloak"],
+      "webOrigins": ["${IAM_PUBLIC_URL}"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${IAM_PUBLIC_URL}/*",
+        "access.token.lifespan": "300"
+      },
+      "defaultClientScopes": ["openid", "profile", "email", "acr", "basic"],
+      "protocolMappers": [
+        {
+          "name": "audience iam-core",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": { "included.client.audience": "iam-core", "access.token.claim": "true", "id.token.claim": "false" }
+        },
+        {
+          "name": "authentication methods (amr)",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-amr-mapper",
+          "config": { "id.token.claim": "true", "access.token.claim": "true", "introspection.token.claim": "true" }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "4f0a6d3e-8c1b-4d2a-9e5f-1a2b3c4d5e6f",
+      "username": "iam-admin",
+      "firstName": "Platform",
+      "lastName": "Administrator",
+      "email": "iam-admin@example.org",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [ { "type": "password", "value": "${IAM_ADMIN_INITIAL_PASSWORD}", "temporary": true } ],
+      "requiredActions": ["CONFIGURE_TOTP", "UPDATE_PASSWORD"]
+    }
+  ]
+}

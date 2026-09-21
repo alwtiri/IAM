@@ -1,14 +1,36 @@
-import { useEffect, useState } from 'react';
-import { AppBar, Box, Button, Chip, Container, Toolbar, Typography } from '@mui/material';
+import { useEffect, useMemo, useState } from 'react';
+import { BrowserRouter, MemoryRouter, Route, Routes } from 'react-router';
+import { Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
 import { DirectionalTheme } from './theme';
 import { directionOf, messages, type Locale } from './i18n/messages';
+import { LocaleContext } from './i18n/LocaleContext';
+import { ApiError, apiFetch, startLogin } from './api/client';
+import type { EffectiveAccess } from './api/types';
+import { Shell } from './layout/Shell';
+import { flatten, isAvailable, type NavItem } from './navigation';
+import { AuditPage, HealthPage, PlannedPage, ProvidersPage, RolesPage, TargetsPage, UsersPage } from './pages/Pages';
+import { ErrorAlert } from './pages/common';
 
-/**
- * Phase 1 application shell. Shows platform identity and language/RTL support only.
- * The baseline navigation (spec §61), authentication (BFF) and pages arrive in Phase 2.
- */
-export function App({ initialLocale = 'en' }: { initialLocale?: Locale }) {
+const PAGES: Record<string, () => React.JSX.Element> = {
+  dashboard: HealthPage,
+  systemHealth: HealthPage,
+  users: UsersPage,
+  roles: RolesPage,
+  rolesPermissions: RolesPage,
+  auditLogs: AuditPage,
+  allTargets: TargetsPage,
+  providerManagement: ProvidersPage,
+};
+
+function routeElement(item: NavItem) {
+  const Page = PAGES[item.id];
+  return isAvailable(item) && Page ? <Page /> : <PlannedPage item={item} />;
+}
+
+export function App({ initialLocale = 'en', inMemoryRouter = false }: { initialLocale?: Locale; inMemoryRouter?: boolean }) {
   const [locale, setLocale] = useState<Locale>(initialLocale);
+  const [me, setMe] = useState<EffectiveAccess>();
+  const [error, setError] = useState<unknown>();
   const t = messages[locale];
   const direction = directionOf(locale);
 
@@ -17,30 +39,40 @@ export function App({ initialLocale = 'en' }: { initialLocale?: Locale }) {
     document.documentElement.dir = direction;
   }, [locale, direction]);
 
+  useEffect(() => {
+    apiFetch<EffectiveAccess>('/api/v1/me').then(setMe, setError);
+  }, []);
+
+  const ctx = useMemo(() => ({ locale, t, toggle: () => setLocale(locale === 'en' ? 'ar' : 'en') }), [locale, t]);
+  const Router = inMemoryRouter ? MemoryRouter : BrowserRouter;
+
+  let content: React.JSX.Element;
+  if (error && !(error instanceof ApiError && error.status === 401)) {
+    content = <Box sx={{ p: 4 }}><ErrorAlert error={error} /></Box>;
+  } else if (!me) {
+    content = (
+      <Stack sx={{ p: 6 }} spacing={2} alignItems="flex-start">
+        <Typography variant="h4" component="h1">{t.appTitle}</Typography>
+        <Typography color="text.secondary">{t.appSubtitle}</Typography>
+        {error ? <Button variant="contained" onClick={() => startLogin()}>{t.signIn}</Button> : <CircularProgress aria-label={t.loading} />}
+      </Stack>
+    );
+  } else {
+    content = (
+      <Shell me={me}>
+        <Routes>
+          {flatten().filter((i) => !i.children).map((i) => <Route key={i.id} path={i.path} element={routeElement(i)} />)}
+          <Route path="*" element={<HealthPage />} />
+        </Routes>
+      </Shell>
+    );
+  }
+
   return (
-    <DirectionalTheme direction={direction}>
-      <AppBar position="static" color="default" elevation={1}>
-        <Toolbar sx={{ gap: 2 }}>
-          <Typography variant="h6" component="h1" sx={{ flexGrow: 1 }}>
-            {t.appTitle}
-          </Typography>
-          <Button onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')} lang={locale === 'en' ? 'ar' : 'en'}>
-            {t.switchLanguage}
-          </Button>
-        </Toolbar>
-      </AppBar>
-      <Container maxWidth="md" sx={{ py: 6 }}>
-        <Typography variant="h5" component="p" gutterBottom>
-          {t.appSubtitle}
-        </Typography>
-        <Typography color="text.secondary" gutterBottom>
-          {t.phaseNotice}
-        </Typography>
-        <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography component="span">{t.healthLabel}:</Typography>
-          <Chip label={t.healthUnknown} variant="outlined" />
-        </Box>
-      </Container>
-    </DirectionalTheme>
+    <LocaleContext.Provider value={ctx}>
+      <DirectionalTheme direction={direction}>
+        <Router>{content}</Router>
+      </DirectionalTheme>
+    </LocaleContext.Provider>
   );
 }

@@ -5,7 +5,7 @@
 | Phase | 1 — Architecture & Domain Model |
 | Date | 2026-09-21 |
 | Baseline | Master Prompt §0–§85 · Phase 0 Report (approved) with Addendum G (gate clarifications G1–G12) |
-| Status | **Submitted for gate approval — Phase 2 not started** |
+| Status | **APPROVED 2026-09-21** (owner). C1: local run met 2026-09-22; the CI part is carried into Phase 2 condition C2 |
 | Decision requested | Approve Phase 1 and authorize Phase 2 — IAM Foundation, subject to condition C1 (§6) |
 
 ---

@@ -33,19 +33,19 @@ Base package `com.enterprise.iam.core`. Each direct sub-package is a module. Onl
 | `risk` | shared |
 | `sod` | shared, audit, authorization |
 | `target` | shared, audit, organization |
-| `provider` | shared, audit, target |
+| `provider` | shared, audit, target, secrets (credential storage — Phase 2) |
 | `operation` | shared, audit |
 | `secrets` | shared, audit, operation |
 | `account` | shared, audit, identity, target, provider, operation, secrets |
 | `request` | shared, audit, identity, account, target, policy, risk, sod, authorization, operation |
 | `approval` | shared, audit, request, sod, identity |
 | `session` | shared, audit, request, account, secrets, policy, target |
-| `notification` | shared, operation |
+| `notification` | shared, operation, audit, identity, authorization (event listeners — Phase 2) |
 | `reporting` | read-only query APIs of any module |
 | `search` | read-only query APIs of any module |
-| `health` | shared, provider, operation |
+| `health` | shared (checks are contributed by modules via `shared.api.health.ComponentHealthCheck` — Phase 2) |
 
-Cycles are forbidden. Reactions flowing "upward" (e.g. `approval` completing a `request`) use domain events, not direct calls.
+Cycles are forbidden. Cross-cutting security contracts (`CurrentActor`, `AccessGuard`, `ResourceScope`, `ScopeFilter`, `Permissions`, `BootstrapAdministratorGrant`) live in `shared.api.security` and are implemented by the authorization and identity modules (dependency inversion, PHASE-2-DESIGN §3.2). Reactions flowing "upward" (e.g. `approval` completing a `request`) use domain events, not direct calls.
 
 ## 3. Rules enforced by tests
 

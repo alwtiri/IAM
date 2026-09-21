@@ -16,3 +16,5 @@ Format: Context / Decision / Consequences. Numbered sequentially, never renumber
 - [ADR-0012: API versioning, error model, and contract-first OpenAPI](ADR-0012-api-versioning-and-error-model.md)
 - [ADR-0013: Policy model and in-process deterministic evaluator](ADR-0013-policy-model-and-evaluator.md)
 - [ADR-0014: Spring Boot 4.0 / Spring Framework 7 as backend baseline](ADR-0014-spring-boot-4-baseline.md)
+- [ADR-0015: Persistence with Spring JdbcClient and explicit SQL](ADR-0015-persistence-spring-jdbcclient.md)
+- [ADR-0016: BFF authentication, actor resolution, and one-time platform bootstrap](ADR-0016-bff-authentication-and-bootstrap.md)
