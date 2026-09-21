@@ -1,0 +1,25 @@
+name: scheduled-security
+on:
+  schedule:
+    - cron: '0 2 * * 1'   # weekly, Monday 02:00 UTC
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  owasp-dependency-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: enterprise-iam-pam
+          path: .
+          format: HTML
+          args: --failOnCVSS 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-check-report
+          path: reports
+          if-no-files-found: ignore

@@ -1,0 +1,138 @@
+# iam-core configuration. Environment-specific values come from environment variables; secret values come only from
+# files mounted under /run/secrets (Spring configtree, file name = property name). No secret has a default here.
+spring:
+  application:
+    name: iam-core
+  config:
+    import: "optional:configtree:/run/secrets/"
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${IAM_DB_URL:jdbc:postgresql://postgres:5432/iam}
+    username: ${IAM_DB_USER:iam_app}
+    # password: provided by /run/secrets/spring.datasource.password
+    hikari:
+      maximum-pool-size: ${IAM_DB_POOL_MAX:20}
+      connection-timeout: 5000
+  flyway:
+    enabled: ${IAM_FLYWAY_ENABLED:true}
+    # Migrations run as the owner role; the application role has DML only (DATA-MODEL.md §1.10).
+    user: ${IAM_DB_MIGRATION_USER:iam_owner}
+    # password: provided by /run/secrets/spring.flyway.password
+    locations: classpath:db/migration
+    # Flyway's own history table lives in a dedicated schema; 'public' is closed for object creation.
+    default-schema: platform
+    create-schemas: true
+    baseline-on-migrate: false
+    clean-disabled: true
+    validate-on-migrate: true
+    out-of-order: false
+  rabbitmq:
+    host: ${IAM_RABBITMQ_HOST:rabbitmq}
+    port: ${IAM_RABBITMQ_PORT:5672}
+    username: ${IAM_RABBITMQ_USER:iam}
+    virtual-host: ${IAM_RABBITMQ_VHOST:iam}
+    # password: provided by /run/secrets/spring.rabbitmq.password
+    connection-timeout: 3s
+    publisher-confirm-type: simple
+    publisher-returns: false
+  mail:
+    # spring.mail.host is intentionally NOT set here: set SPRING_MAIL_HOST (and SPRING_MAIL_PORT) to enable e-mail.
+    # Without it no mail sender exists, notifications are not queued, and health reports SMTP as "not configured".
+    properties:
+      mail.smtp.connectiontimeout: 3000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+  mvc:
+    problemdetails:
+      enabled: false
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  port: 8080
+  shutdown: graceful
+  error:
+    include-stacktrace: never
+    include-message: never
+    include-binding-errors: never
+    include-exception: false
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      timeout: ${IAM_SESSION_IDLE_TIMEOUT:15m}
+      cookie:
+        name: ${IAM_SESSION_COOKIE_NAME:IAM_SESSION}
+        http-only: true
+        secure: ${IAM_SECURE_COOKIES:false}
+        same-site: lax
+
+iam:
+  version: ${IAM_VERSION:0.2.0-SNAPSHOT}
+  build-sha: ${IAM_BUILD_SHA:dev}
+  bootstrap:
+    # Keycloak user id (sub) of the first platform administrator; used once, only while no platform user exists.
+    admin-subject: ${IAM_BOOTSTRAP_ADMIN_SUBJECT:}
+  auth:
+    issuer: ${IAM_AUTH_ISSUER:http://localhost:8088/auth/realms/iam}
+    authorization-uri: ${IAM_AUTH_AUTHORIZATION_URI:http://localhost:8088/auth/realms/iam/protocol/openid-connect/auth}
+    token-uri: ${IAM_AUTH_TOKEN_URI:http://keycloak:8080/auth/realms/iam/protocol/openid-connect/token}
+    jwk-set-uri: ${IAM_AUTH_JWKS_URI:http://keycloak:8080/auth/realms/iam/protocol/openid-connect/certs}
+    user-info-uri: ${IAM_AUTH_USERINFO_URI:http://keycloak:8080/auth/realms/iam/protocol/openid-connect/userinfo}
+    end-session-uri: ${IAM_AUTH_END_SESSION_URI:http://localhost:8088/auth/realms/iam/protocol/openid-connect/logout}
+    client-id: ${IAM_AUTH_CLIENT_ID:iam-core}
+    # client-secret: provided by /run/secrets/iam.auth.client-secret
+    audience: ${IAM_AUTH_AUDIENCE:iam-core}
+    post-logout-redirect-uri: ${IAM_AUTH_POST_LOGOUT_URI:http://localhost:8088/}
+    secure-cookies: ${IAM_SECURE_COOKIES:false}
+    step-up:
+      acr-values: ${IAM_STEP_UP_ACR:mfa,2,gold}
+      amr-values: ${IAM_STEP_UP_AMR:otp,mfa,hwk,swk}
+      max-age: ${IAM_STEP_UP_MAX_AGE:PT5M}
+  vault:
+    address: ${IAM_VAULT_ADDR:http://vault:8200}
+    kv-mount: ${IAM_VAULT_KV_MOUNT:iam}
+    role-id-file: /run/secrets/vault_role_id
+    secret-id-file: /run/secrets/vault_secret_id
+  cache:
+    host: ${IAM_CACHE_HOST:cache}
+    port: ${IAM_CACHE_PORT:6379}
+    password-file: /run/secrets/cache_password
+  mail:
+    from: ${IAM_MAIL_FROM:iam-platform@localhost}
+  outbox:
+    relay-interval: PT2S
+    backlog-warning: 1000
+  expiry:
+    interval: PT1M
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+    # Optional dependencies must not affect the actuator status (the platform health API reports them instead).
+    rabbit:
+      enabled: false
+    mail:
+      enabled: false
+    redis:
+      enabled: false
+
+logging:
+  structured:
+    format:
+      console: ecs
+  level:
+    root: INFO
