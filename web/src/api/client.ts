@@ -73,7 +73,17 @@ export async function apiFetch<T>(
     return undefined as T;
   }
   const text = await response.text();
-  const json: unknown = text ? JSON.parse(text) : undefined;
+  let json: unknown;
+  try {
+    json = text ? JSON.parse(text) : undefined;
+  } catch {
+    // Not JSON (e.g. an HTML error page from a proxy or an outdated backend): report status instead of a parser error.
+    throw new ApiError(response.status, {
+      code: response.status === 502 || response.status === 503 || response.status === 504 ? 'DEPENDENCY_UNAVAILABLE' : 'INTERNAL_ERROR',
+      message: `Unexpected non-JSON response (HTTP ${response.status}) from ${path}`,
+      retryable: response.status >= 500,
+    });
+  }
   if (!response.ok) {
     const body = (json as ApiErrorBody | undefined) ?? { code: 'INTERNAL_ERROR', message: response.statusText, retryable: false };
     throw new ApiError(response.status, body);

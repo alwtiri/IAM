@@ -82,6 +82,11 @@ describe('api client', () => {
     expect(post[1].credentials).toBe('same-origin');
   });
 
+  it('reports HTML error pages as structured errors with the HTTP status', async () => {
+    const fetchFn = vi.fn(async () => new Response('<html><body><h1>Whitelabel Error Page</h1></body></html>', { status: 403 }));
+    await expect(apiFetch('/api/v1/me', {}, { fetchFn, cookies: '' })).rejects.toMatchObject({ status: 403, body: { code: 'INTERNAL_ERROR' } });
+  });
+
   it('surfaces structured errors including STEP_UP_REQUIRED', async () => {
     const fetchFn = vi.fn(async () => new Response(JSON.stringify({ code: 'STEP_UP_REQUIRED', message: 'mfa', retryable: false }), { status: 403 }));
     await expect(apiFetch('/api/v1/role-assignments', { method: 'POST' }, { fetchFn, cookies: '' })).rejects.toBeInstanceOf(ApiError);
