@@ -1,0 +1,43 @@
+# Project-specific Semgrep rules (SECURITY-ARCHITECTURE §5, §8; gate clarification G3).
+rules:
+  - id: iam-secret-reveal
+    languages: [java]
+    severity: WARNING
+    message: >-
+      Secret.reveal() exposes secret material. Allowed only in provider/worker credential use and the secrets
+      broker. Add a justification comment and ensure the copy is cleared.
+    patterns:
+      - pattern: $S.reveal()
+      - pattern-not-inside: |
+          // semgrep-justified: $REASON
+          ...
+    paths:
+      exclude: ["**/src/test/**", "shared-kernel/**"]
+
+  - id: iam-no-secret-logging
+    languages: [java]
+    severity: ERROR
+    message: Do not log secret material, tokens, or passwords (spec §71).
+    pattern-either:
+      - pattern: $LOG.$M(..., (Secret $X).reveal(), ...)
+      - pattern-regex: (?i)log(ger)?\.(trace|debug|info|warn|error)\(.*(password|secret|token|privatekey)
+    paths:
+      exclude: ["**/src/test/**"]
+
+  - id: iam-no-plaintext-secret-cache
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Caching secret values is forbidden as an availability workaround (gate clarification G3). Secrets must be
+      redeemed just-in-time from Vault.
+    pattern-regex: (?i)(Map|Cache)<[^>]*,\s*(Secret|char\[\])>
+    paths:
+      exclude: ["**/src/test/**"]
+
+  - id: iam-no-stacktrace-to-client
+    languages: [java]
+    severity: ERROR
+    message: Never expose stack traces or exception messages to API clients (spec §73).
+    pattern-either:
+      - pattern: $E.printStackTrace()
+      - pattern: ResponseEntity.$M(...).body($E.getMessage())

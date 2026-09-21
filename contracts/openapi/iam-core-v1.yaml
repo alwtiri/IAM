@@ -1,0 +1,448 @@
+openapi: 3.1.0
+info:
+  title: Enterprise IAM / PAM Platform — Core API
+  version: 1.0.0-phase1
+  summary: Public REST API of iam-core (contract-first, ADR-0012).
+  description: |
+    Phase 1 foundation contract. It fixes the cross-cutting elements every endpoint uses
+    (error model, pagination, operations, capability states, health, headers).
+    Business endpoints are added additively in their phases; each operation carries
+    `x-iam-phase` (phase that implements it) and `x-iam-permission` (server-side permission).
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: https://iam.example.internal
+    description: Placeholder; real hostnames are environment configuration.
+security:
+  - bffSession: []
+  - bearer: []
+tags:
+  - name: system
+    description: Platform information and health.
+  - name: operations
+    description: Long-running operations (spec §46).
+  - name: capabilities
+    description: Capability model (spec §18).
+paths:
+  /api/v1/system/info:
+    get:
+      tags: [system]
+      operationId: getSystemInfo
+      summary: Platform version and enabled extensions.
+      x-iam-phase: 2
+      x-iam-permission: system:read
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Platform information.
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemInfo'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /api/v1/system/health:
+    get:
+      tags: [system]
+      operationId: getSystemHealth
+      summary: Health of every component with the functionality each affects (spec §62).
+      x-iam-phase: 2
+      x-iam-permission: system:health:read
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Aggregated health. Returned even when components are degraded.
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemHealth'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /api/v1/operations:
+    get:
+      tags: [operations]
+      operationId: listOperations
+      summary: List operations visible to the caller (scope-filtered).
+      x-iam-phase: 2
+      x-iam-permission: operation:read
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/OperationStatus'
+      responses:
+        '200':
+          description: A page of operations.
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationPage'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /api/v1/operations/{operationId}:
+    get:
+      tags: [operations]
+      operationId: getOperation
+      summary: Get one operation. Returns 404 if outside the caller's scope.
+      x-iam-phase: 2
+      x-iam-permission: operation:read
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: operationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The operation.
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /api/v1/capabilities/catalog:
+    get:
+      tags: [capabilities]
+      operationId: getCapabilityCatalog
+      summary: All capability identifiers and status values known to this platform version.
+      x-iam-phase: 2
+      x-iam-permission: system:read
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Capability catalog.
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityCatalog'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    bffSession:
+      type: apiKey
+      in: cookie
+      name: __Host-iam_session
+      description: Browser session issued by the Core BFF after OIDC login. State-changing requests also need X-CSRF-Token.
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: OAuth2 access token from Keycloak for automation clients. Roles are never read from the token.
+  parameters:
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: Accepted if it matches ^[A-Za-z0-9._-]{8,64}$, otherwise replaced by a generated value.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9._-]{8,64}$'
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Required on POSTs that create resources or start operations (ADR-0012).
+      schema:
+        type: string
+        format: uuid
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+        maxLength: 512
+  headers:
+    CorrelationId:
+      description: Correlation id used for this request.
+      schema:
+        type: string
+  responses:
+    Error:
+      description: Structured error (spec §73). Never contains stack traces or secret material.
+      headers:
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+  schemas:
+    ErrorCode:
+      type: string
+      description: Must equal com.enterprise.iam.kernel.ErrorCode (checked in CI).
+      enum:
+        - VALIDATION_FAILED
+        - AUTHENTICATION_REQUIRED
+        - ACCESS_DENIED
+        - STEP_UP_REQUIRED
+        - POLICY_DENIED
+        - SOD_CONFLICT
+        - NOT_FOUND
+        - CONCURRENT_MODIFICATION
+        - INVALID_STATE_TRANSITION
+        - ALREADY_EXISTS
+        - IDEMPOTENCY_KEY_REUSED
+        - UNSUPPORTED_CAPABILITY
+        - RATE_LIMITED
+        - PROVIDER_UNAVAILABLE
+        - SECRETS_UNAVAILABLE
+        - AUTHENTICATION_UNAVAILABLE
+        - DEPENDENCY_UNAVAILABLE
+        - OPERATION_TIMEOUT
+        - INTERNAL_ERROR
+    ApiError:
+      type: object
+      required: [code, message, retryable, timestamp]
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        message:
+          type: string
+          maxLength: 1000
+        operationId:
+          type: [string, 'null']
+          format: uuid
+        providerId:
+          type: [string, 'null']
+          format: uuid
+        retryable:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        correlationId:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldIssue'
+    FieldIssue:
+      type: object
+      required: [field, code]
+      properties:
+        field:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+    PageInfo:
+      type: object
+      required: [limit]
+      properties:
+        limit:
+          type: integer
+        nextCursor:
+          type: [string, 'null']
+    OperationStatus:
+      type: string
+      enum: [QUEUED, RUNNING, SUCCESS, FAILED, TIMEOUT, CANCELLED, PARTIAL, UNKNOWN]
+      description: SUCCESS is only reported after verification of the target state (spec §46).
+    Operation:
+      type: object
+      required: [id, type, status, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          examples: [ACCOUNT_DISABLE]
+        providerInstanceId:
+          type: [string, 'null']
+          format: uuid
+        targetId:
+          type: [string, 'null']
+          format: uuid
+        requesterId:
+          type: [string, 'null']
+          format: uuid
+        requestId:
+          type: [string, 'null']
+          format: uuid
+        status:
+          $ref: '#/components/schemas/OperationStatus'
+        statusReason:
+          type: [string, 'null']
+          description: e.g. back-pressure, circuit open, waiting for secrets.
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        attempt:
+          type: integer
+        maxAttempts:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: [string, 'null']
+          format: date-time
+        finishedAt:
+          type: [string, 'null']
+          format: date-time
+        deadline:
+          type: [string, 'null']
+          format: date-time
+        error:
+          oneOf:
+            - $ref: '#/components/schemas/ApiError'
+            - type: 'null'
+        verification:
+          oneOf:
+            - $ref: '#/components/schemas/Verification'
+            - type: 'null'
+        correlationId:
+          type: string
+    Verification:
+      type: object
+      required: [mode, verifiedAt, summary]
+      properties:
+        mode:
+          type: string
+          enum: [READ_BACK, LOGIN_TEST, TARGET_CONFIRMATION]
+        verifiedAt:
+          type: string
+          format: date-time
+        summary:
+          type: string
+          maxLength: 512
+    OperationPage:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Operation'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    CapabilityStatus:
+      type: string
+      enum: [SUPPORTED, UNSUPPORTED, UNAVAILABLE, DEGRADED, AGENT_REQUIRED]
+    CapabilityCatalog:
+      type: object
+      required: [capabilities, statuses, spiVersion]
+      properties:
+        spiVersion:
+          type: string
+          examples: ['1.0']
+        capabilities:
+          type: array
+          description: Must equal com.enterprise.iam.provider.spi.Capability. Clients must tolerate unknown values.
+          items:
+            type: string
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilityStatus'
+    HealthStatus:
+      type: string
+      enum: [HEALTHY, DEGRADED, UNAVAILABLE, UNKNOWN]
+    ComponentHealth:
+      type: object
+      required: [component, category, status, checkedAt]
+      properties:
+        component:
+          type: string
+          examples: [vault, rabbitmq, provider:vmware:vc01, gateway:ssh]
+        category:
+          type: string
+          enum: [APPLICATION, DATABASE, CACHE, MESSAGE_BROKER, SECRETS, AUTHENTICATION, PROVIDER, AGENT, GATEWAY, WORKER, INTEGRATION]
+        classification:
+          type: string
+          enum: [CORE, CORE_DEPENDENCY, EXTENSION, OPTIONAL]
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+        reason:
+          type: [string, 'null']
+        affectedFunctionality:
+          type: array
+          description: What is unavailable or degraded because of this component (spec §62).
+          items:
+            type: string
+        checkedAt:
+          type: string
+          format: date-time
+    SystemHealth:
+      type: object
+      required: [status, components]
+      properties:
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComponentHealth'
+    SystemInfo:
+      type: object
+      required: [version, apiVersion]
+      properties:
+        version:
+          type: string
+        apiVersion:
+          type: string
+        buildSha:
+          type: string
+        enabledExtensions:
+          type: array
+          items:
+            type: string

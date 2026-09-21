@@ -1,0 +1,85 @@
+req_id,spec_section,requirement,core_or_extension,target_phase,adr,architecture_ref,implementation_ref,api_ref,ui_ref,db_ref,test_ref,doc_ref,acceptance_criteria_ref,status
+REQ-001,§1,Connected governance flow (no isolated screens),Core,1-12,ADR-0002,docs/architecture/ARCHITECTURE.md#2;docs/architecture/DOMAIN-MODEL.md#2,,,,,,docs/architecture/ARCHITECTURE.md#2,Phase 1-12 gate,DESIGNED
+REQ-002,§2,Core vs Extensions separation; extension failure never crashes Core,Core,1,ADR-0002,docs/architecture/ARCHITECTURE.md#4;#8,core ModuleBoundaryTest;ModularityTest,,,,ModuleBoundaryTest;ModularityTest (CI),docs/architecture/ARCHITECTURE.md#4,Phase 1 gate,DESIGNED
+REQ-003,§3,Phase independence & failure isolation,Core,1-12,ADR-0002;ADR-0006,docs/architecture/ARCHITECTURE.md#7;#8;docs/architecture/WORKER-ISOLATION.md,deploy/compose/compose.yaml,,,,ci/check-compose-policy.py,docs/architecture/ARCHITECTURE.md#7,Phase 1-12 gate,DESIGNED
+REQ-004,§4,Fail-closed security / fail-safe availability,Core,2-12,ADR-0005;ADR-0008,docs/architecture/ARCHITECTURE.md#7;docs/security/SECURITY-ARCHITECTURE.md#1,core SecurityConfiguration (deny-by-default),,,,,docs/architecture/ARCHITECTURE.md#7,Phase 2-12 gate,DESIGNED
+REQ-005,§5,Organization model & identity types,Core,2,,docs/architecture/DOMAIN-MODEL.md#3,,,,,,docs/architecture/DOMAIN-MODEL.md#3,Phase 2 gate,DESIGNED
+REQ-006,§6,Person distinct from Identity,Core,2,,docs/architecture/DOMAIN-MODEL.md#3,,,,,,docs/architecture/DOMAIN-MODEL.md#3,Phase 2 gate,DESIGNED
+REQ-007,§7,Joiner / Mover / Leaver,Core,4,,docs/architecture/DOMAIN-MODEL.md#3,,,,,,docs/architecture/DOMAIN-MODEL.md#3,Phase 4 gate,DESIGNED
+REQ-008,§8,Account management across platforms; orphan/dormant detection,Core,3;5;8,ADR-0003,docs/architecture/DOMAIN-MODEL.md#6,,,,docs/architecture/DATA-MODEL.md,,docs/architecture/DOMAIN-MODEL.md#6,Phase 3;5;8 gate,DESIGNED
+REQ-009,§9,Distinct domain concepts,Core,1,,docs/architecture/DOMAIN-MODEL.md,,,,,,docs/architecture/DOMAIN-MODEL.md,Phase 1 gate,DESIGNED
+REQ-010,§10,Target model,Core,2;3,,docs/architecture/DOMAIN-MODEL.md#7,,,,,,docs/architecture/DOMAIN-MODEL.md#7,Phase 2;3 gate,DESIGNED
+REQ-011,§11,Provider abstraction & capabilities; UNSUPPORTED_CAPABILITY,Core,1;3,ADR-0003,docs/architecture/DOMAIN-MODEL.md#7;provider-spi,provider-spi/;provider-spi-testkit/,,,,provider-spi-testkit ContractChecksNegativeTest;InMemoryTestProviderContractTest,docs/architecture/DOMAIN-MODEL.md#7,Phase 1;3 gate,DESIGNED
+REQ-012,§12,First-class providers (core + enterprise infra),Extension,3;5,ADR-0003,docs/architecture/ARCHITECTURE.md#4,,,,,,docs/architecture/ARCHITECTURE.md#4,Phase 3;5 gate,DESIGNED
+REQ-013,§13,Active Directory provider (optional),Extension,3,ADR-0003,docs/architecture/DOMAIN-MODEL.md#7,,,,,,docs/architecture/DOMAIN-MODEL.md#7,Phase 3 gate,DESIGNED
+REQ-014,§14,Windows Server target != AD target,Core,2;3,,docs/architecture/DOMAIN-MODEL.md#7,,,,,,docs/architecture/DOMAIN-MODEL.md#7,Phase 2;3 gate,DESIGNED
+REQ-015,§15,"Hybrid agent/agentless, agentless by default",Extension,3;5;6,,docs/architecture/ARCHITECTURE.md#9,,,,,,docs/architecture/ARCHITECTURE.md#9,Phase 3;5;6 gate,DESIGNED
+REQ-016,§16,Agent purpose (no second IAM),Extension,6+,,docs/architecture/ARCHITECTURE.md#9,,,,,,docs/architecture/ARCHITECTURE.md#9,Phase 6+ gate,DESIGNED
+REQ-017,§17,"Agent failure isolation, states, mTLS",Extension,6+,,docs/architecture/ARCHITECTURE.md#9;docs/architecture/DOMAIN-MODEL.md#12,,,,,,docs/architecture/ARCHITECTURE.md#9,Phase 6+ gate,DESIGNED
+REQ-018,§18,Target capability model & UI states,Core,3,,docs/architecture/DOMAIN-MODEL.md#7,provider-spi CapabilityStatus,,,,OperationResultInvariantsTest.runtimeStatesCannotBeDeclared,docs/architecture/DOMAIN-MODEL.md#7,Phase 3 gate,DESIGNED
+REQ-019,§19,"Enterprise RBAC with scopes, backend enforced",Core,2,ADR-0004,docs/architecture/DOMAIN-MODEL.md#4;docs/security/SECURITY-ARCHITECTURE.md#4,,,,,,docs/architecture/DOMAIN-MODEL.md#4,Phase 2 gate,DESIGNED
+REQ-020,§20,Access Request engine & lifecycle,Core,4,,docs/architecture/DOMAIN-MODEL.md#8,,,,,,docs/architecture/DOMAIN-MODEL.md#8,Phase 4 gate,DESIGNED
+REQ-021,§21,Approval engine,Core,4,,docs/architecture/DOMAIN-MODEL.md#8,,,,,,docs/architecture/DOMAIN-MODEL.md#8,Phase 4 gate,DESIGNED
+REQ-022,§22,Segregation of Duties,Core,4,,docs/architecture/DOMAIN-MODEL.md#5,,,,,,docs/architecture/DOMAIN-MODEL.md#5,Phase 4 gate,DESIGNED
+REQ-023,§23,Central policy engine,Core,4,ADR-0002,docs/architecture/DOMAIN-MODEL.md#5;docs/adr/ADR-0013,,,,,,docs/architecture/DOMAIN-MODEL.md#5,Phase 4 gate,DESIGNED
+REQ-024,§24,Explainable risk engine,Core,4,,docs/architecture/DOMAIN-MODEL.md#5,,,,,,docs/architecture/DOMAIN-MODEL.md#5,Phase 4 gate,DESIGNED
+REQ-025,§25,"MFA (TOTP, WebAuthn, passkeys, step-up)",Core,2,ADR-0004,docs/security/SECURITY-ARCHITECTURE.md#3,,,,,,docs/security/SECURITY-ARCHITECTURE.md#3,Phase 2 gate,DESIGNED
+REQ-026,§26,Secrets & credential management (Vault),Core,2;3;6,ADR-0005,docs/security/SECURITY-ARCHITECTURE.md#5,,,,,,docs/security/SECURITY-ARCHITECTURE.md#5,Phase 2;3;6 gate,DESIGNED
+REQ-027,§27,Verified password rotation,Core,3;6,ADR-0005,docs/architecture/ARCHITECTURE.md#6.6;provider-spi Provider.rotatePassword,provider-spi Provider.rotatePassword (contract),,,,,docs/architecture/ARCHITECTURE.md#6.6,Phase 3;6 gate,DESIGNED
+REQ-028,§28,Emergency / break-glass access,Core,4;6,,docs/architecture/DOMAIN-MODEL.md#8,,,,,,docs/architecture/DOMAIN-MODEL.md#8,Phase 4;6 gate,DESIGNED
+REQ-029,§29,Dual control,Core,4;6,ADR-0005,docs/architecture/DOMAIN-MODEL.md#8,,,,,,docs/architecture/DOMAIN-MODEL.md#8,Phase 4;6 gate,DESIGNED
+REQ-030,§30,PAM access gateway,Extension,6,ADR-0007,docs/architecture/ARCHITECTURE.md#10,,,,,,docs/architecture/ARCHITECTURE.md#10,Phase 6 gate,DESIGNED
+REQ-031,§31,SSH access,Extension,6,ADR-0007,docs/architecture/ARCHITECTURE.md#10,,,,,,docs/architecture/ARCHITECTURE.md#10,Phase 6 gate,DESIGNED
+REQ-032,§32,RDP access,Extension,6,ADR-0007,docs/architecture/ARCHITECTURE.md#10,,,,,,docs/architecture/ARCHITECTURE.md#10,Phase 6 gate,DESIGNED
+REQ-033,§33,Web application access,Extension,6,,docs/architecture/ARCHITECTURE.md#10,,,,,,docs/architecture/ARCHITECTURE.md#10,Phase 6 gate,DESIGNED
+REQ-034,§34,Database governance + database PAM,Extension,5;6,,docs/architecture/ARCHITECTURE.md#11,,,,,,docs/architecture/ARCHITECTURE.md#11,Phase 5;6 gate,DESIGNED
+REQ-035,§35,Network access,Extension,5;6,,docs/architecture/ARCHITECTURE.md#10,,,,,,docs/architecture/ARCHITECTURE.md#10,Phase 5;6 gate,DESIGNED
+REQ-036,§36,"API access governance (pam-gateway-api, G7)",Extension,6,,docs/architecture/ARCHITECTURE.md#4 (pam-gateway-api),,,,,,docs/architecture/ARCHITECTURE.md#4 (pam-gateway-api),Phase 6 gate,DESIGNED
+REQ-037,§37,Session management,Extension,6,,docs/architecture/DOMAIN-MODEL.md#10,,,,,,docs/architecture/DOMAIN-MODEL.md#10,Phase 6 gate,DESIGNED
+REQ-038,§38,Session recording (tamper-protected),Extension,6,ADR-0008,docs/architecture/DOMAIN-MODEL.md#10,,,,,,docs/architecture/DOMAIN-MODEL.md#10,Phase 6 gate,DESIGNED
+REQ-039,§39,Command governance,Extension,6,ADR-0007,docs/architecture/DOMAIN-MODEL.md#10,,,,,,docs/architecture/DOMAIN-MODEL.md#10,Phase 6 gate,DESIGNED
+REQ-040,§40,File transfer governance,Extension,6,,docs/architecture/DOMAIN-MODEL.md#10,,,,,,docs/architecture/DOMAIN-MODEL.md#10,Phase 6 gate,DESIGNED
+REQ-041,§41,Asset management,Core,2;5,,docs/architecture/DOMAIN-MODEL.md#7,,,,,,docs/architecture/DOMAIN-MODEL.md#7,Phase 2;5 gate,DESIGNED
+REQ-042,§42,Certificate management,Extension,8,,docs/architecture/DOMAIN-MODEL.md#1,,,,,,docs/architecture/DOMAIN-MODEL.md#1,Phase 8 gate,DESIGNED
+REQ-043,§43,CMDB / dependency model,Extension,8,,docs/architecture/DOMAIN-MODEL.md#7,,,,,,docs/architecture/DOMAIN-MODEL.md#7,Phase 8 gate,DESIGNED
+REQ-044,§44,Modular discovery (non-modifying),Core,3;8,ADR-0003,provider-spi (discovery read-only rule),,,,,,provider-spi (discovery read-only rule),Phase 3;8 gate,DESIGNED
+REQ-045,§45,Reconciliation & drift,Core,8,,docs/architecture/DOMAIN-MODEL.md#6;provider-spi ReconciliationReport,,,,,,docs/architecture/DOMAIN-MODEL.md#6,Phase 8 gate,DESIGNED
+REQ-046,§46,Operations model (verified SUCCESS),Core,2,ADR-0003,docs/architecture/DOMAIN-MODEL.md#9,provider-spi OperationResult (SUCCESS⇒verification),,,,OperationResultInvariantsTest,docs/architecture/DOMAIN-MODEL.md#9,Phase 2 gate,DESIGNED
+REQ-047,§47,Idempotency,Core,2;3,ADR-0006,docs/architecture/WORKER-ISOLATION.md#6,,,,,,docs/architecture/WORKER-ISOLATION.md#6,Phase 2;3 gate,DESIGNED
+REQ-048,§48,Asynchronous processing,Core,2;8,ADR-0006,docs/architecture/WORKER-ISOLATION.md,contracts/messaging/*.schema.json,,,,,docs/architecture/WORKER-ISOLATION.md,Phase 2;8 gate,DESIGNED
+REQ-049,§49,Audit subsystem,Core,2,ADR-0008,docs/architecture/DOMAIN-MODEL.md#11,,,,docs/architecture/DATA-MODEL.md,,docs/architecture/DOMAIN-MODEL.md#11,Phase 2 gate,DESIGNED
+REQ-050,§50,Audit integrity,Core,2;9,ADR-0008,docs/adr/ADR-0008,,,,,,docs/adr/ADR-0008,Phase 2;9 gate,DESIGNED
+REQ-051,§51,Evidence chain,Core,4;6;7,ADR-0008,docs/architecture/DOMAIN-MODEL.md#11,,,,,,docs/architecture/DOMAIN-MODEL.md#11,Phase 4;6;7 gate,DESIGNED
+REQ-052,§52,RBAC-respecting enterprise search,Core,7,,docs/architecture/API-GUIDELINES.md#4,,,,,,docs/architecture/API-GUIDELINES.md#4,Phase 7 gate,DESIGNED
+REQ-053,§53,Reporting,Core,7,,docs/architecture/ARCHITECTURE.md#5,,,,,,docs/architecture/ARCHITECTURE.md#5,Phase 7 gate,DESIGNED
+REQ-054,§54,Official Access Request document,Core,7,,docs/architecture/DOMAIN-MODEL.md#11,,,,,,docs/architecture/DOMAIN-MODEL.md#11,Phase 7 gate,DESIGNED
+REQ-055,§55,License & contract metadata,Core,7,,docs/architecture/DATA-MODEL.md#2,,,,docs/architecture/DATA-MODEL.md,,docs/architecture/DATA-MODEL.md#2,Phase 7 gate,DESIGNED
+REQ-056,§56,Integrations (optional),Extension,8,ADR-0006,docs/architecture/ARCHITECTURE.md#4,,,,,,docs/architecture/ARCHITECTURE.md#4,Phase 8 gate,DESIGNED
+REQ-057,§57,Notifications,Core,2;8,ADR-0006,docs/architecture/ARCHITECTURE.md#5,,,,,,docs/architecture/ARCHITECTURE.md#5,Phase 2;8 gate,DESIGNED
+REQ-058,§58,Security architecture controls,Core,2;9,,docs/security/SECURITY-ARCHITECTURE.md,ci/semgrep/iam-rules.yaml;.github/workflows/ci.yml,,,,semgrep project rules,docs/security/SECURITY-ARCHITECTURE.md,Phase 2;9 gate,DESIGNED
+REQ-059,§59,"PostgreSQL + Flyway, no destructive shortcuts",Core,1-12,ADR-0001,docs/architecture/DATA-MODEL.md#1,core/src/main/resources/db/migration/V1__baseline_module_schemas.sql,,,docs/architecture/DATA-MODEL.md,,docs/architecture/DATA-MODEL.md#1,Phase 1-12 gate,DESIGNED
+REQ-060,§60,Technology stack,Core,1,ADR-0001,docs/adr/ADR-0001;ADR-0014,settings.gradle.kts;gradle/libs.versions.toml,,,,,docs/adr/ADR-0001,Phase 1 gate,DESIGNED
+REQ-061,§61,Frontend navigation,Core,2;7,,docs/architecture/ARCHITECTURE.md#4,web/ (shell only),,,,web App.test.tsx,docs/architecture/ARCHITECTURE.md#4,Phase 2;7 gate,DESIGNED
+REQ-062,§62,System health,Core,2;10,,docs/architecture/ARCHITECTURE.md#8;contracts SystemHealth,,,,,,docs/architecture/ARCHITECTURE.md#8,Phase 2;10 gate,DESIGNED
+REQ-063,§63,Performance,Core,10,,docs/architecture/ARCHITECTURE.md#12,,,,,,docs/architecture/ARCHITECTURE.md#12,Phase 10 gate,DESIGNED
+REQ-064,§64,Provider timeout & circuit breaker,Core,3,ADR-0003,docs/architecture/WORKER-ISOLATION.md#3,,,,,,docs/architecture/WORKER-ISOLATION.md#3,Phase 3 gate,DESIGNED
+REQ-065,§65,Backup / restore / DR,Core,10,ADR-0005,docs/architecture/DEPLOYMENT.md#4,,,,,,docs/architecture/DEPLOYMENT.md#4,Phase 10 gate,DESIGNED
+REQ-066,§66,High availability,Core,10,,docs/architecture/DEPLOYMENT.md#7,,,,,,docs/architecture/DEPLOYMENT.md#7,Phase 10 gate,DESIGNED
+REQ-067,§67,Observability,Core,2;10,,docs/architecture/ARCHITECTURE.md#6.7,shared-kernel CorrelationId,,,,IdsAndCorrelationTest,docs/architecture/ARCHITECTURE.md#6.7,Phase 2;10 gate,DESIGNED
+REQ-068,§68,Security testing,Core,9,,docs/security/THREAT-MODEL-CORE.md,.github/workflows/ci.yml,,,,,docs/security/THREAT-MODEL-CORE.md,Phase 9 gate,DESIGNED
+REQ-069,§69,Testing strategy incl. failure tests,Core,1-12,,docs/phase-0/PHASE-0-REPORT.md#15,,,,,,docs/phase-0/PHASE-0-REPORT.md#15,Phase 1-12 gate,DESIGNED
+REQ-070,§70,Test environments separation,Core,1;10,,docs/architecture/DEPLOYMENT.md#8,deploy/compose (.env/secrets separation),,,,,docs/architecture/DEPLOYMENT.md#8,Phase 1;10 gate,DESIGNED
+REQ-071,§71,Data protection (no secrets in logs),Core,2,,docs/security/SECURITY-ARCHITECTURE.md#8,shared-kernel Secret,,,,SecretTest,docs/security/SECURITY-ARCHITECTURE.md#8,Phase 2 gate,DESIGNED
+REQ-072,§72,API design,Core,1;2,,docs/architecture/API-GUIDELINES.md,contracts/openapi/iam-core-v1.yaml,contracts/openapi/iam-core-v1.yaml,,,redocly lint;ci/check-contract-sync.py,docs/architecture/API-GUIDELINES.md,Phase 1;2 gate,DESIGNED
+REQ-073,§73,Structured error model,Core,1,,docs/architecture/API-GUIDELINES.md#7,shared-kernel ErrorCode/ApiError,contracts/openapi/iam-core-v1.yaml,,,IdsAndCorrelationTest,docs/architecture/API-GUIDELINES.md#7,Phase 1 gate,DESIGNED
+REQ-074,§74,Documentation set,Core,1-12,,,docs/,,,,,,Phase 1-12 gate,DESIGNED
+REQ-075,§75,Phases,Core,0-12,,docs/phase-0/PHASE-0-REPORT.md,,,,,,docs/phase-0/PHASE-0-REPORT.md,Phase 0-12 gate,PLANNED
+REQ-076,§76,Phase gating,Core,0-12,,docs/phase-0/PHASE-0-REPORT.md,,,,,,docs/phase-0/PHASE-0-REPORT.md,Phase 0-12 gate,PLANNED
+REQ-077,§77,Phase 0 discovery,Core,0,,docs/phase-0/PHASE-0-REPORT.md,,,,,,docs/phase-0/PHASE-0-REPORT.md,Phase 0 gate,ACCEPTED
+REQ-078,§78,No destructive shortcuts,Core,0-12,,docs/phase-0/PHASE-0-REPORT.md,,,,,,docs/phase-0/PHASE-0-REPORT.md,Phase 0-12 gate,PLANNED
+REQ-079,§79,Incremental implementation,Core,0-12,,docs/phase-0/PHASE-0-REPORT.md,,,,,,docs/phase-0/PHASE-0-REPORT.md,Phase 0-12 gate,PLANNED
+REQ-080,§80,Traceability matrix,Core,0-12,,docs/phase-0/PHASE-0-REPORT.md,docs/traceability/rtm.csv,,,,,docs/phase-0/PHASE-0-REPORT.md,Phase 0-12 gate,DESIGNED
+REQ-081,§81,Acceptance criteria,Core,12,,docs/phase-0/PHASE-0-REPORT.md,,,,,,docs/phase-0/PHASE-0-REPORT.md,Phase 12 gate,PLANNED
+REQ-082,§82,Final architectural principle,Core,1-12,ADR-0002,docs/architecture/ARCHITECTURE.md#1,,,,,,docs/architecture/ARCHITECTURE.md#1,Phase 1-12 gate,DESIGNED
+REQ-083,§83,No hidden dependency on Core; 10 questions per component,Core,1-12,ADR-0002,docs/architecture/ARCHITECTURE.md#8,core ModuleBoundaryTest,,,,ModuleBoundaryTest (CI),docs/architecture/ARCHITECTURE.md#8,Phase 1-12 gate,DESIGNED
+REQ-084,§84,Final product vision,Core,12,,docs/phase-0/PHASE-0-REPORT.md,,,,,,docs/phase-0/PHASE-0-REPORT.md,Phase 12 gate,PLANNED

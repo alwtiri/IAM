@@ -1,0 +1,7 @@
+# OpenAPI lint configuration (ADR-0012). Run: npx @redocly/cli lint contracts/openapi/iam-core-v1.yaml
+extends:
+  - recommended
+rules:
+  # Shared components (e.g. Idempotency-Key) are defined in Phase 1 and referenced by business endpoints from Phase 2.
+  no-unused-components: off
+  operation-4xx-response: error
