@@ -1,5 +1,8 @@
 package com.enterprise.iam.core.provider.application;
 
+import com.enterprise.iam.core.provider.api.ProviderBindingView;
+import com.enterprise.iam.core.provider.api.ProviderDirectory;
+import com.enterprise.iam.core.target.api.TargetDirectory;
 import com.enterprise.iam.core.audit.api.AuditEntry;
 import com.enterprise.iam.core.audit.api.AuditRecorder;
 import com.enterprise.iam.core.provider.api.ProviderInstanceView;
@@ -24,6 +27,7 @@ import java.time.Clock;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -33,7 +37,7 @@ import java.util.logging.Logger;
  * Vault entry is destroyed again if the database write fails, so neither a dangling reference nor an orphaned secret
  * is left behind. Vault unavailable → {@code SECRETS_UNAVAILABLE}; nothing is persisted.
  */
-public class ProviderRegistryService {
+public class ProviderRegistryService implements ProviderDirectory {
 
     private static final Logger LOG = Logger.getLogger(ProviderRegistryService.class.getName());
 
@@ -49,9 +53,16 @@ public class ProviderRegistryService {
     private final AuditRecorder audit;
     private final TransactionRunner tx;
     private final Clock clock;
+    private final TargetDirectory targets;
 
     public ProviderRegistryService(ProviderStore store, SecretStore secrets, AccessGuard guard, AuditRecorder audit,
                                    TransactionRunner tx, Clock clock) {
+        this(store, secrets, guard, audit, tx, clock, targetId -> Optional.empty());
+    }
+
+    public ProviderRegistryService(ProviderStore store, SecretStore secrets, AccessGuard guard, AuditRecorder audit,
+                                   TransactionRunner tx, Clock clock, TargetDirectory targets) {
+        this.targets = targets;
         this.store = store;
         this.secrets = secrets;
         this.guard = guard;
@@ -128,6 +139,58 @@ public class ProviderRegistryService {
         }
         return new CapabilityCatalog(SpiVersion.current(), Arrays.stream(Capability.values()).map(Enum::name).toList(),
                 Arrays.stream(CapabilityStatus.values()).map(Enum::name).toList());
+    }
+
+    // ------------------------------------------------------------------ target bindings (Phase 3)
+
+    /** Binds a provider instance to a target; both the instance and the target must be in the actor's write scope. */
+    public List<ProviderBindingView> bind(CurrentActor actor, UUID targetId, UUID providerInstanceId, String channel) {
+        String ch = channel == null || channel.isBlank() ? "accounts" : channel;
+        if (!ch.matches("^[a-z][a-z-]{1,31}$")) {
+            throw IamException.validation("channel", "INVALID", "lower-case channel name such as accounts");
+        }
+        return tx.inTransaction(() -> {
+            ProviderInstance p = store.find(providerInstanceId).orElseThrow(() -> IamException.notFound("Provider instance"));
+            guard.require(actor, Permissions.PROVIDER_WRITE, scope(p), true);
+            ResourceScope target = targets.scopeOf(targetId).orElseThrow(() -> IamException.notFound("Target"));
+            guard.require(actor, Permissions.TARGET_WRITE, target, true);
+            if (store.bind(targetId, providerInstanceId, ch)) {
+                audit.record(actor, new AuditEntry("provider-instance.bound", "provider-instance", providerInstanceId.toString(), targetId,
+                        AuditEntry.Result.SUCCESS, null, providerInstanceId, Map.of("channel", ch, "type", p.type().value())));
+            }
+            return store.bindings(targetId);
+        });
+    }
+
+    public List<ProviderBindingView> unbind(CurrentActor actor, UUID targetId, UUID providerInstanceId) {
+        return tx.inTransaction(() -> {
+            ProviderInstance p = store.find(providerInstanceId).orElseThrow(() -> IamException.notFound("Provider instance"));
+            guard.require(actor, Permissions.PROVIDER_WRITE, scope(p), true);
+            ResourceScope target = targets.scopeOf(targetId).orElseThrow(() -> IamException.notFound("Target"));
+            guard.require(actor, Permissions.TARGET_WRITE, target, true);
+            if (store.unbind(targetId, providerInstanceId)) {
+                audit.record(actor, new AuditEntry("provider-instance.unbound", "provider-instance", providerInstanceId.toString(), targetId,
+                        AuditEntry.Result.SUCCESS, null, providerInstanceId, Map.of()));
+            }
+            return store.bindings(targetId);
+        });
+    }
+
+    public List<ProviderBindingView> bindings(CurrentActor actor, UUID targetId) {
+        ResourceScope target = targets.scopeOf(targetId).orElseThrow(() -> IamException.notFound("Target"));
+        guard.require(actor, Permissions.TARGET_READ, target, true);
+        return tx.readOnly(() -> store.bindings(targetId));
+    }
+
+    @Override
+    public Optional<Connection> connection(UUID providerInstanceId) {
+        return store.find(providerInstanceId).map(p -> new Connection(p.id(), p.type().value(), p.endpoint(), p.settings(),
+                p.credentialSecretRef(), p.enabled()));
+    }
+
+    @Override
+    public boolean isBound(UUID targetId, UUID providerInstanceId) {
+        return store.isBound(targetId, providerInstanceId);
     }
 
     static ResourceScope scope(ProviderInstance p) {

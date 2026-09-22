@@ -289,6 +289,12 @@ public class JdbcAccountStore implements AccountStore {
     }
 
     @Override
+    public Optional<DiscoveryRunView> findRunByOperation(UUID operationId) {
+        return jdbc.sql("SELECT * FROM account.discovery_run WHERE operation_id = :op").param("op", operationId)
+                .query((rs, n) -> run(rs)).optional();
+    }
+
+    @Override
     public void addRunCounts(UUID id, int seen, int created, int groups) {
         jdbc.sql("""
                 UPDATE account.discovery_run SET accounts_seen = accounts_seen + :seen, accounts_new = accounts_new + :created,

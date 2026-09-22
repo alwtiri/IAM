@@ -1412,7 +1412,7 @@ paths:
       - name: targetId
         in: query
         required: false
-        schema: &id012
+        schema: &id014
           type: string
           format: uuid
       - name: governanceState
@@ -1624,6 +1624,264 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/DiscoveryRun'
+    post:
+      tags:
+      - accounts
+      operationId: startDiscovery
+      summary: Start read-only account discovery through a bound provider instance
+      x-iam-phase: 3
+      x-iam-permission: account:discover
+      parameters:
+      - &id009
+        $ref: '#/components/parameters/CorrelationId'
+      - &id010
+        $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '202':
+          description: Accepted
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationSubmitted'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartDiscovery'
+  /api/v1/targets/{id}/provider-bindings:
+    get:
+      tags:
+      - providers
+      operationId: listProviderBindings
+      summary: Provider instances bound to a target
+      x-iam-phase: 3
+      x-iam-permission: target:read
+      parameters:
+      - *id009
+      - *id010
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProviderBinding'
+    post:
+      tags:
+      - providers
+      operationId: bindProvider
+      summary: Bind a provider instance to a target (requires target:write on the target as well)
+      x-iam-phase: 3
+      x-iam-permission: provider:write
+      parameters:
+      - *id009
+      - *id010
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProviderBinding'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BindProvider'
+  /api/v1/targets/{id}/provider-bindings/{providerInstanceId}:
+    delete:
+      tags:
+      - providers
+      operationId: unbindProvider
+      summary: Remove a provider binding
+      x-iam-phase: 3
+      x-iam-permission: provider:write
+      parameters:
+      - *id009
+      - *id010
+      - name: providerInstanceId
+        in: path
+        required: true
+        schema: &id017
+          type: string
+          format: uuid
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProviderBinding'
+  /api/v1/accounts/{id}:enable:
+    post:
+      tags:
+      - accounts
+      operationId: enableAccount
+      summary: Enable the account on its target (verified)
+      x-iam-phase: 3
+      x-iam-permission: operation:execute
+      parameters:
+      - *id009
+      - *id010
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '202':
+          description: Accepted
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationSubmitted'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationReason'
+  /api/v1/accounts/{id}:disable:
+    post:
+      tags:
+      - accounts
+      operationId: disableAccount
+      summary: Disable the account on its target (verified)
+      x-iam-phase: 3
+      x-iam-permission: operation:execute
+      parameters:
+      - *id009
+      - *id010
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '202':
+          description: Accepted
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationSubmitted'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationReason'
+  /api/v1/accounts/{id}:unlock:
+    post:
+      tags:
+      - accounts
+      operationId: unlockAccount
+      summary: Unlock the account on its target (verified)
+      x-iam-phase: 3
+      x-iam-permission: operation:execute
+      parameters:
+      - *id009
+      - *id010
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '202':
+          description: Accepted
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationSubmitted'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationReason'
+  /api/v1/accounts/{id}:refresh:
+    post:
+      tags:
+      - accounts
+      operationId: refreshAccount
+      summary: Read the current account state from the target
+      x-iam-phase: 3
+      x-iam-permission: account:read
+      parameters:
+      - *id009
+      - *id010
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '202':
+          description: Accepted
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationSubmitted'
 components:
   securitySchemes:
     bffSession:
@@ -2034,7 +2292,7 @@ components:
       - version
       properties:
         id: *id003
-        parentId: &id009
+        parentId: &id011
           type:
           - string
           - 'null'
@@ -2073,7 +2331,7 @@ components:
       - code
       - name
       properties:
-        parentId: *id009
+        parentId: *id011
         kind:
           $ref: '#/components/schemas/OrgUnitKind'
         code:
@@ -2136,7 +2394,7 @@ components:
       - givenName
       - familyName
       properties:
-        orgUnitId: *id009
+        orgUnitId: *id011
         employeeId:
           type:
           - string
@@ -2153,9 +2411,9 @@ components:
           - string
           - 'null'
           maxLength: 200
-        positionId: *id009
-        locationId: *id009
-        managerPersonId: *id009
+        positionId: *id011
+        locationId: *id011
+        managerPersonId: *id011
         employmentStatus:
           $ref: '#/components/schemas/EmploymentStatus'
         startDate:
@@ -2189,7 +2447,7 @@ components:
       - version
       properties:
         id: *id003
-        orgUnitId: *id009
+        orgUnitId: *id011
         employeeId:
           type:
           - string
@@ -2200,9 +2458,9 @@ components:
           type: string
         displayName:
           type: string
-        positionId: *id009
-        locationId: *id009
-        managerPersonId: *id009
+        positionId: *id011
+        locationId: *id011
+        managerPersonId: *id011
         employmentStatus:
           $ref: '#/components/schemas/EmploymentStatus'
         startDate:
@@ -2274,7 +2532,7 @@ components:
         username:
           type: string
           pattern: ^[a-z0-9][a-z0-9._-]{2,63}$
-        validUntil: &id010
+        validUntil: &id012
           type:
           - string
           - 'null'
@@ -2306,7 +2564,7 @@ components:
           - string
           - 'null'
         validFrom: *id004
-        validUntil: *id010
+        validUntil: *id012
         platformUser:
           type: boolean
         version:
@@ -2412,8 +2670,8 @@ components:
           maxItems: 50
           items:
             $ref: '#/components/schemas/ScopeElement'
-        validFrom: *id010
-        validUntil: *id010
+        validFrom: *id012
+        validUntil: *id012
         reason:
           type:
           - string
@@ -2455,11 +2713,11 @@ components:
           - REVOKED
           - EXPIRED
         validFrom: *id004
-        validUntil: *id010
-        grantedBy: *id009
+        validUntil: *id012
+        grantedBy: *id011
         grantedAt: *id004
-        revokedBy: *id009
-        revokedAt: *id010
+        revokedBy: *id011
+        revokedAt: *id012
         reason:
           type:
           - string
@@ -2497,7 +2755,7 @@ components:
           type:
           - string
           - 'null'
-        authenticatedAt: *id010
+        authenticatedAt: *id012
         grants:
           type: array
           items:
@@ -2517,7 +2775,7 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/ScopeElement'
-              validUntil: *id010
+              validUntil: *id012
     AuditEvent:
       type: object
       required:
@@ -2533,7 +2791,7 @@ components:
         seq:
           type: integer
         occurredAt: *id004
-        actorIdentityId: *id009
+        actorIdentityId: *id011
         actorType:
           type: string
           enum:
@@ -2551,7 +2809,7 @@ components:
           type:
           - string
           - 'null'
-        targetId: *id009
+        targetId: *id011
         source:
           type:
           - string
@@ -2574,7 +2832,7 @@ components:
           type:
           - string
           - 'null'
-        providerInstanceId: *id009
+        providerInstanceId: *id011
         details:
           type: object
           additionalProperties:
@@ -2701,10 +2959,10 @@ components:
           - CONFIDENTIAL
           - RESTRICTED
         ownerOrgUnitId: *id003
-        ownerIdentityId: *id009
-        technicalOwnerIdentityId: *id009
-        businessOwnerIdentityId: *id009
-        locationId: *id009
+        ownerIdentityId: *id011
+        technicalOwnerIdentityId: *id011
+        businessOwnerIdentityId: *id011
+        locationId: *id011
         tags:
           type: array
           maxItems: 50
@@ -2775,14 +3033,14 @@ components:
         ownerOrgUnitId:
           type: string
           format: uuid
-        ownerIdentityId: &id011
+        ownerIdentityId: &id013
           type:
           - string
           - 'null'
           format: uuid
-        technicalOwnerIdentityId: *id011
-        businessOwnerIdentityId: *id011
-        locationId: *id011
+        technicalOwnerIdentityId: *id013
+        businessOwnerIdentityId: *id013
+        locationId: *id013
         tags:
           type: array
           maxItems: 50
@@ -2888,7 +3146,7 @@ components:
           - CLOSED
           - OPEN
           - HALF_OPEN
-        lastHealthAt: *id010
+        lastHealthAt: *id012
         failureReason:
           type:
           - string
@@ -2971,11 +3229,11 @@ components:
       - openFindings
       - version
       properties:
-        id: *id012
-        targetId: *id012
+        id: *id014
+        targetId: *id014
         targetName:
           type: string
-        providerInstanceId: *id012
+        providerInstanceId: *id014
         providerType:
           type: string
         nativeId:
@@ -2994,12 +3252,12 @@ components:
           type:
           - string
           - 'null'
-        ownerIdentityId: &id013
+        ownerIdentityId: &id015
           type:
           - string
           - 'null'
           format: uuid
-        linkedIdentityId: *id013
+        linkedIdentityId: *id015
         governanceState:
           $ref: '#/components/schemas/AccountGovernanceState'
         nativeStatus:
@@ -3014,13 +3272,13 @@ components:
           type: object
           additionalProperties:
             type: string
-        lastSeenAt: &id014
+        lastSeenAt: &id016
           type:
           - string
           - 'null'
           format: date-time
-        lastLoginAt: *id014
-        passwordLastSetAt: *id014
+        lastLoginAt: *id016
+        passwordLastSetAt: *id016
         openFindings:
           type: array
           items:
@@ -3049,8 +3307,8 @@ components:
       properties:
         type:
           $ref: '#/components/schemas/AccountType'
-        ownerIdentityId: *id013
-        linkedIdentityId: *id013
+        ownerIdentityId: *id015
+        linkedIdentityId: *id015
         governanceState:
           description: MANAGED is set by credential onboarding and REMOVED by discovery; both are rejected here.
           allOf:
@@ -3070,11 +3328,11 @@ components:
       - severity
       - detectedAt
       properties:
-        id: *id012
-        accountId: *id012
+        id: *id014
+        accountId: *id014
         accountName:
           type: string
-        targetId: *id012
+        targetId: *id014
         targetName:
           type: string
         type:
@@ -3084,7 +3342,7 @@ components:
         detectedAt:
           type: string
           format: date-time
-        resolvedAt: *id014
+        resolvedAt: *id016
         resolution:
           type:
           - string
@@ -3127,10 +3385,10 @@ components:
       - status
       - startedAt
       properties:
-        id: *id012
-        providerInstanceId: *id012
-        targetId: *id012
-        operationId: *id013
+        id: *id014
+        providerInstanceId: *id014
+        targetId: *id014
+        operationId: *id015
         status:
           type: string
           enum:
@@ -3140,7 +3398,7 @@ components:
         startedAt:
           type: string
           format: date-time
-        finishedAt: *id014
+        finishedAt: *id016
         accountsSeen:
           type: integer
         accountsNew:
@@ -3153,3 +3411,57 @@ components:
           type:
           - string
           - 'null'
+    ProviderBinding:
+      type: object
+      required:
+      - targetId
+      - providerInstanceId
+      - providerType
+      - channel
+      properties:
+        targetId: *id017
+        providerInstanceId: *id017
+        providerType:
+          type: string
+        providerName:
+          type: string
+        channel:
+          type: string
+    BindProvider:
+      type: object
+      required:
+      - providerInstanceId
+      properties:
+        providerInstanceId: *id017
+        channel:
+          type:
+          - string
+          - 'null'
+          pattern: ^[a-z][a-z-]{1,31}$
+          description: 'Default: accounts'
+    StartDiscovery:
+      type: object
+      required:
+      - providerInstanceId
+      properties:
+        providerInstanceId: *id017
+    OperationSubmitted:
+      type: object
+      required:
+      - operationId
+      description: Poll GET /api/v1/operations/{operationId} for progress.
+      properties:
+        operationId: *id017
+        discoveryRunId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+    OperationReason:
+      type: object
+      properties:
+        reason:
+          type:
+          - string
+          - 'null'
+          maxLength: 500

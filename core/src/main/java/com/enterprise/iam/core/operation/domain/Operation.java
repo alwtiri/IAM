@@ -86,6 +86,12 @@ public final class Operation {
         finish(now, "OPERATION_TIMEOUT", message);
     }
 
+    /** Some sub-steps succeeded, others did not; the outcome needs attention (e.g. a paged run stopped midway). */
+    public void partial(String message, Instant now) {
+        transition(OperationStatus.PARTIAL);
+        finish(now, "PARTIAL", message);
+    }
+
     public void unknown(String message, Instant now) {
         transition(OperationStatus.UNKNOWN);
         finish(now, "OUTCOME_UNVERIFIED", message);

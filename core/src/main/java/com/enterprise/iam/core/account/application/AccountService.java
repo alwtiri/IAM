@@ -233,6 +233,23 @@ public class AccountService {
         });
     }
 
+    /** Refreshes an account's native state from a verified lifecycle-operation result. */
+    public void applyObservedState(UUID accountId, DiscoveredAccount observed) {
+        if (observed == null) {
+            return;
+        }
+        tx.run(() -> {
+            AccountStore.Scoped s = store.find(accountId).orElse(null);
+            if (s == null) {
+                return;
+            }
+            Account next = s.account().observed(observed, clock.instant());
+            if (store.update(next, s.account().version())) {
+                evaluateFindings(next, false, clock.instant());
+            }
+        });
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private void evaluateFindings(Account a, boolean newOnBaselinedTarget, Instant now) {

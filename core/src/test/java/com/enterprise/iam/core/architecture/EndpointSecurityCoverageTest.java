@@ -3,6 +3,7 @@ package com.enterprise.iam.core.architecture;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.enterprise.iam.core.shared.api.security.AuthenticatedEndpoint;
+import com.enterprise.iam.core.shared.api.security.InternalEndpoint;
 import com.enterprise.iam.core.shared.api.security.PublicEndpoint;
 import com.enterprise.iam.core.shared.api.security.RequiresPermission;
 import java.lang.reflect.Method;
@@ -33,7 +34,7 @@ class EndpointSecurityCoverageTest {
                 }
                 handlers++;
                 boolean declared = m.isAnnotationPresent(RequiresPermission.class) || m.isAnnotationPresent(AuthenticatedEndpoint.class)
-                        || m.isAnnotationPresent(PublicEndpoint.class);
+                        || m.isAnnotationPresent(PublicEndpoint.class) || m.isAnnotationPresent(InternalEndpoint.class);
                 if (!declared) {
                     missing.add(type.getSimpleName() + "#" + m.getName());
                 }

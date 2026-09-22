@@ -138,6 +138,11 @@ class AccountServiceTest {
         }
 
         @Override
+        public Optional<DiscoveryRunView> findRunByOperation(UUID operationId) {
+            return runs.values().stream().filter(r -> operationId.equals(r.operationId())).findFirst();
+        }
+
+        @Override
         public void addRunCounts(UUID id, int seen, int created, int groups) {
             DiscoveryRunView r = runs.get(id);
             runs.put(id, new DiscoveryRunView(r.id(), r.providerInstanceId(), r.targetId(), r.operationId(), r.status(), r.startedAt(), null,

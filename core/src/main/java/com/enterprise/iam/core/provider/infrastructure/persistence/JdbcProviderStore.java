@@ -5,6 +5,7 @@ import static com.enterprise.iam.core.shared.api.jdbc.JdbcTypes.json;
 import static com.enterprise.iam.core.shared.api.jdbc.JdbcTypes.stringMap;
 import static com.enterprise.iam.core.shared.api.jdbc.JdbcTypes.uuid;
 
+import com.enterprise.iam.core.provider.api.ProviderBindingView;
 import com.enterprise.iam.core.provider.api.ProviderInstanceView;
 import com.enterprise.iam.core.provider.application.ProviderStore;
 import com.enterprise.iam.core.provider.domain.ProviderInstance;
@@ -83,6 +84,36 @@ public class JdbcProviderStore implements ProviderStore {
         sql.append(" ORDER BY p.id LIMIT :limit");
         params.put("limit", page.limit() + 1);
         return jdbc.sql(sql.toString()).params(params).query(JdbcProviderStore::view).list();
+    }
+
+    @Override
+    public boolean bind(UUID targetId, UUID providerInstanceId, String channel) {
+        return jdbc.sql("""
+                INSERT INTO provider.target_binding (target_id, provider_instance_id, channel) VALUES (:t, :p, :c)
+                ON CONFLICT DO NOTHING""").param("t", targetId).param("p", providerInstanceId).param("c", channel).update() == 1;
+    }
+
+    @Override
+    public boolean unbind(UUID targetId, UUID providerInstanceId) {
+        return jdbc.sql("DELETE FROM provider.target_binding WHERE target_id = :t AND provider_instance_id = :p")
+                .param("t", targetId).param("p", providerInstanceId).update() > 0;
+    }
+
+    @Override
+    public List<ProviderBindingView> bindings(UUID targetId) {
+        return jdbc.sql("""
+                SELECT b.target_id, b.provider_instance_id, b.channel, p.type, p.name
+                FROM provider.target_binding b JOIN provider.provider_instance p ON p.id = b.provider_instance_id
+                WHERE b.target_id = :t ORDER BY p.name, b.channel""").param("t", targetId)
+                .query((rs, n) -> new ProviderBindingView(uuid(rs, "target_id"), uuid(rs, "provider_instance_id"), rs.getString("type"),
+                        rs.getString("name"), rs.getString("channel")))
+                .list();
+    }
+
+    @Override
+    public boolean isBound(UUID targetId, UUID providerInstanceId) {
+        return jdbc.sql("SELECT count(*) FROM provider.target_binding WHERE target_id = :t AND provider_instance_id = :p")
+                .param("t", targetId).param("p", providerInstanceId).query(Long.class).single() > 0;
     }
 
     static ProviderInstanceView view(ResultSet rs, int n) throws SQLException {

@@ -1,5 +1,11 @@
 package com.enterprise.iam.core.secrets.infrastructure.config;
 
+import com.enterprise.iam.core.audit.api.AuditRecorder;
+import com.enterprise.iam.core.secrets.api.SecretStore;
+import com.enterprise.iam.core.secrets.application.CredentialHandleService;
+import com.enterprise.iam.core.secrets.infrastructure.persistence.JdbcCredentialHandleStore;
+import com.enterprise.iam.core.shared.api.tx.TransactionRunner;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import com.enterprise.iam.core.secrets.application.VaultClient;
 import com.enterprise.iam.core.secrets.application.VaultHealthCheck;
 import com.enterprise.iam.core.secrets.application.VaultSecretStore;
@@ -36,6 +42,11 @@ class SecretsConfiguration {
     @Bean
     VaultSecretStore secretStore(VaultClient vault) {
         return new VaultSecretStore(vault);
+    }
+
+    @Bean
+    CredentialHandleService credentialHandleService(JdbcClient jdbc, SecretStore secrets, AuditRecorder audit, TransactionRunner tx, Clock clock) {
+        return new CredentialHandleService(new JdbcCredentialHandleStore(jdbc), secrets, audit, tx, clock);
     }
 
     @Bean

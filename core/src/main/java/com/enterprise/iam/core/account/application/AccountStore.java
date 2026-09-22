@@ -63,6 +63,8 @@ public interface AccountStore {
 
     Optional<DiscoveryRunView> findRun(UUID id);
 
+    Optional<DiscoveryRunView> findRunByOperation(UUID operationId);
+
     void addRunCounts(UUID id, int seen, int created, int groups);
 
     void finishRun(UUID id, String status, int removed, String errorMessage, Instant at);

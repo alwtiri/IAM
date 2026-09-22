@@ -1,5 +1,9 @@
 package com.enterprise.iam.core.provider.infrastructure.web;
 
+import org.springframework.web.bind.annotation.DeleteMapping;
+import java.util.List;
+import jakarta.validation.constraints.NotNull;
+import com.enterprise.iam.core.provider.api.ProviderBindingView;
 import com.enterprise.iam.core.provider.api.ProviderInstanceView;
 import com.enterprise.iam.core.provider.application.ProviderRegistryService;
 import com.enterprise.iam.core.shared.api.paging.PageRequest;
@@ -80,6 +84,27 @@ class ProviderController {
     @RequiresPermission(Permissions.PROVIDER_WRITE)
     ProviderInstanceView disable(@PathVariable UUID id) {
         return providers.setEnabled(actors.require(), id, false);
+    }
+
+    record BindRequest(@NotNull UUID providerInstanceId, @Size(max = 32) String channel) {
+    }
+
+    @GetMapping("/targets/{id}/provider-bindings")
+    @RequiresPermission(Permissions.TARGET_READ)
+    List<ProviderBindingView> bindings(@PathVariable UUID id) {
+        return providers.bindings(actors.require(), id);
+    }
+
+    @PostMapping("/targets/{id}/provider-bindings")
+    @RequiresPermission(Permissions.PROVIDER_WRITE)
+    List<ProviderBindingView> bind(@PathVariable UUID id, @Valid @RequestBody BindRequest r) {
+        return providers.bind(actors.require(), id, r.providerInstanceId(), r.channel());
+    }
+
+    @DeleteMapping("/targets/{id}/provider-bindings/{providerInstanceId}")
+    @RequiresPermission(Permissions.PROVIDER_WRITE)
+    List<ProviderBindingView> unbind(@PathVariable UUID id, @PathVariable UUID providerInstanceId) {
+        return providers.unbind(actors.require(), id, providerInstanceId);
     }
 
     @GetMapping("/capabilities/catalog")

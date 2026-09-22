@@ -20,6 +20,11 @@ public class VaultSecretStore implements SecretStore {
     }
 
     @Override
+    public Secret read(SecretRef ref) {
+        return vault.readKv(ref.path(), ref.version());
+    }
+
+    @Override
     public void destroy(SecretRef ref) {
         vault.destroyKv(ref.path());
     }
