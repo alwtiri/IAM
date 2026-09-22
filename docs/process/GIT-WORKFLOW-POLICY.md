@@ -156,6 +156,7 @@ The project optimizes for fast local iteration, safe Git history, controlled rem
 |---|---|
 | Local security and policy checks, before committing | `ci/local-checks.sh` (Semgrep project rules, contract/enum sync, compose hardening policy, shell lint; plus the registry Semgrep packs, Gitleaks, and Trivy when installed or reachable) |
 | Local backend build (same as CI) | `ci/local-build.sh` — `./gradlew build` in the pinned JDK image, including Testcontainers tests |
+| Local image build + vulnerability scan (same as CI) | `ci/local-image-scan.sh`: builds both images and runs Trivy as a container (HIGH/CRITICAL, fixable) |
 | Local recovery point | `git commit` with a meaningful message; no push |
 | Checkpoint push (phase gate, milestone) | `scripts/git-push.sh "message" [branch]`: shows the branch and status, blocks secret files, commits, pushes once, and prints the PR link |
 | Phase-2 runtime validation | `deploy/compose/scripts/smoke-phase2.sh` |

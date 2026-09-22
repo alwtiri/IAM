@@ -1,8 +1,8 @@
 # Central dependency versions (ADR-0014). Updated by a dependency bot; every bump must pass CI.
 [versions]
 java = "21"
-spring-boot = "4.0.1"
-spring-modulith = "2.0.1"
+spring-boot = "4.0.8"
+spring-modulith = "2.0.8"
 spring-dependency-management = "1.1.7"
 junit = "5.13.4"
 archunit = "1.4.1"
