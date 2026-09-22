@@ -6,8 +6,8 @@
 #   docker compose up -d --build
 #   ./scripts/vault-init-dev.sh            # once per fresh vault volume (dev only)
 #
-# Later-phase services (worker pools, scheduler, gateways, integrations, object store) are added in
-# separate compose files in their phases. They are intentionally NOT declared here (gate clarification G10).
+# Services are added in the phase that implements them (gate clarification G10): iam-worker from Phase 3;
+# scheduler, gateways, integrations and object store in their phases.
 # Image tags are pinned to exact versions; digest pinning is automated in Phase 9.
 # =====================================================================
 name: iam
@@ -117,6 +117,32 @@ services:
       timeout: 5s
       start_period: 90s
       retries: 5
+
+  # ------------------------------------------------------------------ worker plane (Phase 3)
+  iam-worker:
+    <<: [*hardening, *logging]
+    build: { context: ../.., dockerfile: worker/Dockerfile }
+    image: iam-worker:dev
+    user: "10001:10001"
+    environment:
+      # Provider types served by this worker (one queue each, G4). Split into several workers per pool in production.
+      IAM_WORKER_POOLS: linux-ssh,active-directory,windows-winrm,generic-rest
+      IAM_CORE_INTERNAL_URL: https://iam-core:8443
+    secrets:
+      - source: rabbitmq_password
+        target: spring.rabbitmq.password
+      - source: pki_ca_crt
+        target: pki_ca_crt
+      - source: pki_worker_crt
+        target: pki_worker_crt
+      - source: pki_worker_key
+        target: pki_worker_key
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      iam-core: { condition: service_healthy }
+    # No database access. Reaches RabbitMQ and the Core on the core network and managed targets via egress.
+    networks: [core]
+    mem_limit: 768m
 
   # ------------------------------------------------------------------ core dependencies
   postgres:

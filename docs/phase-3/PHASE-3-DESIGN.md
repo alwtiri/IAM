@@ -59,7 +59,7 @@ flowchart LR
 Rules:
 
 - **Queue isolation (G4).** One queue per provider type, with dedicated consumers and prefetch. The worker can run as one container per pool group (`WORKER_POOLS=linux-ssh` or similar), so a slow provider cannot starve others.
-- **Resilience per provider instance.** Resilience4j `CircuitBreaker` (50 % over 20 calls or 5 consecutive connect failures, half-open after 60 s), `Bulkhead` (8 os / 4 directory), and `TimeLimiter` (120 s lifecycle, 30 min discovery). When a breaker is open, messages are republished to the delay queue and health is reported as `UNAVAILABLE`.
+- **Resilience per provider instance.** Circuit breaker (50 % over 20 calls or 5 consecutive connect failures, half-open after 60 s with one trial call), semaphore bulkhead (default 4 calls per instance), and a hard deadline per operation (2 min lifecycle, 30 min discovery). While a breaker is open, operations for that instance fail fast with `PROVIDER_UNAVAILABLE` (retryable, nothing applied) instead of occupying pool capacity. Transient failures are retried up to 3 times inside the deadline, re-using the once-redeemed credential.
 - **Verification.** Every mutating call is followed by `getAccountState` or a provider-specific check. `VerificationMode` decides between immediate and eventual verification (AD replication). The result is `SUCCESS` only with verification evidence; otherwise it is `PARTIAL` or `VERIFICATION_FAILED`.
 - **Idempotency.** Commands carry `idempotencyKey`. Providers implement create-if-absent, disable-if-enabled, and so on, and the worker keeps a 24 h processed-key cache. Core allows one in-flight mutating operation per account.
 

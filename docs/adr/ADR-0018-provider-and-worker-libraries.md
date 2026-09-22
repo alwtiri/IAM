@@ -17,7 +17,7 @@ Phase 3 implements the first providers and the worker runtime. The SPI (`provide
 | LDAP/LDAPS (active-directory) | UnboundID LDAP SDK | Pure Java, no JNDI quirks, paged results, `unicodePwd` modify over LDAPS, and a strict TLS trust manager. GPL/LGPL/UnboundID Free Use; the LGPL/Free Use license is used. |
 | WinRM (windows-winrm) | `java.net.http` + WS-Management SOAP built in the provider, NTLM via `jcifs-ng` | Avoids heavy CXF-based stacks. The provider sends PowerShell as `-EncodedCommand` with JSON-bound parameters. |
 | SCIM / REST (generic-rest) | `java.net.http` + shared-kernel `Json` | No extra dependency. |
-| Resilience (worker) | Resilience4j (`circuitbreaker`, `bulkhead`, `timelimiter`) | Per-instance registries and metrics via Micrometer. |
+| Resilience (worker) | Small in-house circuit breaker and semaphore bulkhead (`worker/runtime`), deadline via `Future.get` on virtual threads | The needed behaviour is about 150 lines and fully unit-tested, and it keeps the worker runtime framework-free. Resilience4j was considered; it remains an option if metrics or advanced policies are needed. |
 | Tests | Testcontainers (openssh-server, Samba AD DC, Toxiproxy), WireMock | Real protocol behaviour in CI. |
 
 Versions live in `gradle/libs.versions.toml` and are updated with the other dependencies.

@@ -5,36 +5,133 @@
   "description": "Message published by the outbox relay to exchange iam.ops, routing key ops.<providerType> (ADR-0010). Contains no secret values: credentials are credential handles redeemed just-in-time over mTLS.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "messageId", "operationId", "idempotencyKey", "providerType", "providerInstanceId", "operation", "attempt", "deadline", "correlationId", "issuedAt"],
+  "required": [
+    "schemaVersion",
+    "messageId",
+    "operationId",
+    "idempotencyKey",
+    "providerType",
+    "providerInstanceId",
+    "operation",
+    "attempt",
+    "deadline",
+    "correlationId",
+    "issuedAt"
+  ],
   "properties": {
-    "schemaVersion": { "const": 1 },
-    "messageId": { "type": "string", "format": "uuid", "description": "Outbox row id; consumers de-duplicate on it." },
-    "operationId": { "type": "string", "format": "uuid" },
-    "idempotencyKey": { "type": "string", "minLength": 8, "maxLength": 128 },
-    "providerType": { "type": "string", "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$", "maxLength": 48 },
-    "providerInstanceId": { "type": "string", "format": "uuid" },
-    "targetId": { "type": ["string", "null"], "format": "uuid" },
+    "schemaVersion": {
+      "const": 1
+    },
+    "messageId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Outbox row id; consumers de-duplicate on it."
+    },
+    "operationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128
+    },
+    "providerType": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "maxLength": 48
+    },
+    "providerInstanceId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "targetId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
     "operation": {
       "type": "string",
-      "enum": ["VALIDATE_CONNECTION", "DISCOVER", "DISCOVER_ACCOUNTS", "DISCOVER_GROUPS", "DISCOVER_TARGETS", "GET_ACCOUNT_STATE", "CREATE_ACCOUNT", "ENABLE_ACCOUNT", "DISABLE_ACCOUNT", "UNLOCK_ACCOUNT", "DELETE_ACCOUNT", "CHANGE_PASSWORD", "RESET_PASSWORD", "ROTATE_PASSWORD", "CREATE_GROUP", "MODIFY_GROUP", "ADD_GROUP_MEMBER", "REMOVE_GROUP_MEMBER", "MOVE_OBJECT", "APPLY_DESIRED_STATE", "VERIFY_OPERATION", "RECONCILE"],
+      "enum": [
+        "VALIDATE_CONNECTION",
+        "DISCOVER",
+        "DISCOVER_ACCOUNTS",
+        "DISCOVER_GROUPS",
+        "DISCOVER_TARGETS",
+        "GET_ACCOUNT_STATE",
+        "CREATE_ACCOUNT",
+        "ENABLE_ACCOUNT",
+        "DISABLE_ACCOUNT",
+        "UNLOCK_ACCOUNT",
+        "DELETE_ACCOUNT",
+        "CHANGE_PASSWORD",
+        "RESET_PASSWORD",
+        "ROTATE_PASSWORD",
+        "CREATE_GROUP",
+        "MODIFY_GROUP",
+        "ADD_GROUP_MEMBER",
+        "REMOVE_GROUP_MEMBER",
+        "MOVE_OBJECT",
+        "APPLY_DESIRED_STATE",
+        "VERIFY_OPERATION",
+        "RECONCILE"
+      ],
       "description": "Must equal com.enterprise.iam.provider.spi.ProviderOperation."
     },
-    "attempt": { "type": "integer", "minimum": 1 },
-    "deadline": { "type": "string", "format": "date-time" },
-    "correlationId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{8,64}$" },
-    "traceparent": { "type": "string" },
-    "issuedAt": { "type": "string", "format": "date-time" },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "deadline": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{8,64}$"
+    },
+    "traceparent": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
     "credentialHandles": {
       "type": "object",
       "description": "Named credential handles (e.g. connection, current, new). Opaque, single-use, short TTL.",
-      "additionalProperties": { "type": "string", "maxLength": 128 }
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 128
+      }
     },
     "payload": {
       "type": "object",
-      "description": "Operation-specific, non-secret arguments (account ref, spec, group ref, desired state, cursor).",
+      "description": "Operation-specific, non-secret arguments: connection {endpoint, settings} of the provider instance (workers have no database access), account ref {nativeId, name}, spec, group ref, desired state, cursor.",
       "not": {
         "anyOf": [
-          { "required": ["password"] }, { "required": ["secret"] }, { "required": ["token"] }, { "required": ["privateKey"] }
+          {
+            "required": [
+              "password"
+            ]
+          },
+          {
+            "required": [
+              "secret"
+            ]
+          },
+          {
+            "required": [
+              "token"
+            ]
+          },
+          {
+            "required": [
+              "privateKey"
+            ]
+          }
         ]
       }
     }

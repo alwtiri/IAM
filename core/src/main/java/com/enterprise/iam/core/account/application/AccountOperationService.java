@@ -89,7 +89,8 @@ public class AccountOperationService {
                 throw IamException.validation("providerInstanceId", "NOT_BOUND", "bind the provider instance to the target first");
             }
             ProviderCommand cmd = new ProviderCommand("DISCOVER_ACCOUNTS", false, c.type(), c.id(), targetId, null, actor.identityId(),
-                    targetScope.orgUnitPath(), targetScope.environment(), Map.of("includeGroups", true), DISCOVERY_TIMEOUT, 1,
+                    targetScope.orgUnitPath(), targetScope.environment(), Map.of("includeGroups", true, "connection", connectionPayload(c)),
+                    DISCOVERY_TIMEOUT, 1,
                     "discover:" + targetId + ":" + UUID.randomUUID());
             UUID opId = operations.create(cmd);
             UUID runId = accounts.startDiscoveryRun(targetId, providerInstanceId, opId);
@@ -111,7 +112,7 @@ public class AccountOperationService {
             ProviderDirectory.Connection c = connection(a.providerInstanceId());
             ProviderCommand cmd = new ProviderCommand(action.operation, action.mutating, c.type(), c.id(), a.targetId(), a.id(),
                     actor.identityId(), s.orgUnitPath(), s.environment(),
-                    Map.of("account", Map.of("nativeId", a.nativeId(), "name", a.name())), LIFECYCLE_TIMEOUT, 1,
+                    Map.of("account", Map.of("nativeId", a.nativeId(), "name", a.name()), "connection", connectionPayload(c)), LIFECYCLE_TIMEOUT, 1,
                     action.operation.toLowerCase(java.util.Locale.ROOT) + ":" + a.id() + ":" + a.version() + ":" + UUID.randomUUID());
             UUID opId = operations.create(cmd);
             operations.dispatch(opId, cmd, handles.issue(opId, c.type(), Map.of("connection", new SecretRef(c.credentialSecretRef())), HANDLE_TTL));
@@ -121,6 +122,11 @@ public class AccountOperationService {
             }
             return new Submitted(opId, null);
         });
+    }
+
+    /** Non-secret connection details for the worker (it has no database access); the credential travels as a handle. */
+    private static Map<String, Object> connectionPayload(ProviderDirectory.Connection c) {
+        return Map.of("endpoint", c.endpoint(), "settings", c.settings());
     }
 
     private ProviderDirectory.Connection connection(UUID providerInstanceId) {

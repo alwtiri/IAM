@@ -48,6 +48,14 @@ public final class Secret implements AutoCloseable {
         return Arrays.copyOf(value, value.length);
     }
 
+    /** Independent copy that can be destroyed separately (e.g. handed to a provider while the original stays owned). */
+    public Secret copy() {
+        if (destroyed) {
+            throw new IllegalStateException("Secret has been destroyed");
+        }
+        return new Secret(Arrays.copyOf(value, value.length));
+    }
+
     /** Constant-time comparison without revealing either value to the caller. */
     public boolean matches(Secret other) {
         if (other == null || destroyed || other.destroyed) {
