@@ -16,6 +16,7 @@ dependencies {
 
     // Provider plugins are loaded with ServiceLoader from the runtime classpath.
     runtimeOnly(project(":providers:generic-rest"))
+    runtimeOnly(project(":providers:linux-ssh"))
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
