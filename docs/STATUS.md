@@ -1,6 +1,6 @@
 # Project status: what works, what is partial, what remains
 
-Last updated: 2026-09-22 (Phase 6.1). "Works in the UI" means an administrator can do it end to end in the web app without
+Last updated: 2026-09-22 (Phases 6.2–12). "Works in the UI" means an administrator can do it end to end in the web app without
 curl. Everything below is also available through the REST API.
 
 ## Works in the UI (after applying the latest bundle and running update-stack.sh)
@@ -17,6 +17,12 @@ curl. Everything below is also available through the REST API.
 | Databases (PostgreSQL) | Add a database, connect with TLS (password in Vault), test, discover login roles, see superusers and privileged memberships, disable/enable logins with read-back | Assets → Databases |
 | Password vault (PAM) | "Vault" a privileged account: the platform sets a random 24-character password it alone knows (Linux, Windows, AD, PostgreSQL), promotes it only after the target confirmed it, rotates every 30 days, and shows VERIFIED / UNKNOWN / FAILED honestly | Accounts → Privileged Accounts → Vault; Privileged Access → Password Vault |
 | Credential checkout | Request a password for 1–72 h with a justification (policy P-300: PAM administrator approves); or check out directly as a credential manager (MFA + reason); show the password (MFA, audited, hidden after 60 s); check in → the password is changed automatically; overdue checkouts end automatically | Privileged Access → Credential Requests / My Checkouts / Approvals |
+| Emergency access | Mark vaulted accounts as emergency accounts; break glass without approval for 4 h (MFA + reason); security administrators e-mailed at once; every use reviewed by a second person; password rotated afterwards | Emergency Access → Break Glass / Active Emergencies / Reviews |
+| Edit and delete | Servers and databases (edit, delete = decommission), connections (edit, disable/enable, delete), org units (rename), vault (remove) | Assets → Servers → Edit / Delete |
+| Audit views | Access logs, privileged activity, configuration changes | Audit & Compliance |
+| Settings and integrations | Effective non-secret configuration; SIEM forwarding of the audit trail (HMAC-signed HTTPS webhook) | Administration → System Settings / Integrations |
+| Weekly security report | E-mail every Monday 07:00 to security and platform administrators | Automatic (`iam.reports.weekly-cron`) |
+| Operations | Backup/restore scripts, acceptance script, runbook, HA guide | `deploy/compose/scripts/`, `docs/operations/RUNBOOK.md` |
 | Look & feel | shadcn/ui-style design, light and dark mode, Arabic RTL | Header: moon/sun button, العربية |
 | Reports | CSV exports: accounts, privileged accounts, open findings, access requests, users, audit trail | Reports |
 | Scheduled discovery | Every bound server/database is re-discovered daily (configurable `iam.discovery.interval`) | Automatic |
@@ -34,14 +40,13 @@ curl. Everything below is also available through the REST API.
 | Org-unit management screen | API exists; UI uses the list only | With user administration polish |
 | Container image CVE gate | Report-only until Phase 9 (ADR-0019) | Phase 9 |
 
-## Remaining phases (Master Prompt)
+## Not in this release (explicit scope decisions)
 
-| Phase | Scope |
+| Item | Why / plan |
 |---|---|
-| 4 (remaining) | Policy authoring UI, access reviews, joiner/mover/leaver, on-behalf and server-account requests |
-| 5 (remaining) | More providers: MySQL/Oracle/SQL Server, network devices, virtualization, storage |
-| 6 (remaining) | Privileged sessions through SSH/RDP gateways with recording, emergency (break-glass) accounts |
-| 7 (remaining) | Scheduled/emailed reports, access logs, configuration history, settings |
-| 8 (remaining) | Drift detection and reconciliation, SIEM/ITSM/HR integrations |
-| 9 | Security hardening: image gate back on, SBOM, signing, production settings |
-| 10–12 | HA / scale, operations runbooks, final acceptance |
+| Privileged session gateway (SSH/RDP proxy with recording) | Needs a dedicated gateway component (terminal streaming, recording storage); checkouts cover password-based access today |
+| More providers (MySQL, Oracle, SQL Server, network devices, VMware, storage) | Provider SPI is ready; each needs its own provider module and lab |
+| Groups/entitlements management screens | Entitlements are discovered and shown per account; editing follows with the next provider wave |
+| Policy authoring UI, access reviews (certification campaigns) | Policies are seeded and can be enabled/disabled; authoring and campaigns are the next governance increment |
+| HR/ITSM connectors | Events are published on `iam.events` (identity lifecycle, emergency access) for connectors to consume |
+| Production TLS, HA deployment, image signing | Documented in `docs/phase-10/HA-AND-SCALE.md` and ADR-0022; depend on the target infrastructure and registry |

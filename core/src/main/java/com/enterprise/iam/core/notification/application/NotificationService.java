@@ -65,6 +65,31 @@ public class NotificationService {
         }
     }
 
+    /** Break-glass use: e-mail every reviewer and publish an integration event (SIEM/ITSM). */
+    public void onEmergency(com.enterprise.iam.core.account.api.EmergencyAccessUsed e, java.util.Collection<UUID> reviewers) {
+        Map<String, Object> event = new HashMap<>();
+        event.put("type", "emergency.access.used");
+        event.put("checkoutId", e.checkoutId().toString());
+        event.put("accountId", e.accountId().toString());
+        event.put("account", e.accountLabel());
+        event.put("identityId", e.identityId().toString());
+        event.put("until", e.notAfter().toString());
+        event.put("occurredAt", clock.instant().toString());
+        outbox.enqueue("amqp:iam.events/emergency.access", "account", e.accountId().toString(), event, Map.of());
+        for (UUID who : reviewers) {
+            if (who.equals(e.identityId())) {
+                continue;
+            }
+            Map<String, String> v = new HashMap<>();
+            v.put("account", e.accountLabel());
+            v.put("user", e.identityName() == null ? "A user" : e.identityName());
+            v.put("until", e.notAfter().toString());
+            v.put("reason", e.reason());
+            v.put("reference", e.checkoutId().toString());
+            email(who, "emergency.used", v);
+        }
+    }
+
     public void on(IdentityLifecycleChanged e) {
         Map<String, Object> event = new HashMap<>();
         event.put("type", "identity.lifecycle.changed");
@@ -81,6 +106,13 @@ public class NotificationService {
         v.put("reason", e.reason() == null ? "-" : e.reason());
         v.put("reference", e.identityId().toString());
         email(e.identityId(), "identity.lifecycle", v);
+    }
+
+    /** Weekly security summary to the given recipients (Phase 7 scheduled report). */
+    public void weeklyReport(java.util.Collection<UUID> recipients, Map<String, String> figures) {
+        for (UUID who : recipients) {
+            email(who, "report.weekly", figures);
+        }
     }
 
     private void email(UUID identityId, String template, Map<String, String> values) {

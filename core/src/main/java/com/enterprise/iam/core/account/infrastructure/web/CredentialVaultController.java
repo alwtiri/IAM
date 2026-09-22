@@ -1,6 +1,7 @@
 package com.enterprise.iam.core.account.infrastructure.web;
 
 import com.enterprise.iam.core.account.api.CheckoutView;
+import com.enterprise.iam.core.account.api.EmergencyUseView;
 import com.enterprise.iam.core.account.api.RevealedCredential;
 import com.enterprise.iam.core.account.api.VaultedCredentialView;
 import com.enterprise.iam.core.account.application.CredentialVaultService;
@@ -32,6 +33,15 @@ import org.springframework.web.bind.annotation.RestController;
 class CredentialVaultController {
 
     record ReasonRequest(@Size(max = 500) String reason) {
+    }
+
+    record EmergencyFlag(boolean emergency) {
+    }
+
+    record BreakGlassRequest(@NotBlank @Size(min = 10, max = 500) String reason) {
+    }
+
+    record ReviewRequest(@NotBlank @Size(max = 1000) String note) {
     }
 
     record CheckoutRequest(@NotBlank @Size(max = 500) String reason, @Min(1) @Max(72) int durationHours) {
@@ -84,6 +94,31 @@ class CredentialVaultController {
     @RequiresStepUp
     CheckoutView checkoutDirect(@PathVariable UUID accountId, @Valid @RequestBody CheckoutRequest r) {
         return vault.checkoutDirect(actors.require(), accountId, r.durationHours(), r.reason());
+    }
+
+    @PostMapping("/vaulted-credentials/{accountId}:mark-emergency")
+    @RequiresPermission(Permissions.CREDENTIAL_MANAGE)
+    VaultedCredentialView markEmergency(@PathVariable UUID accountId, @RequestBody EmergencyFlag r) {
+        return vault.setEmergency(actors.require(), accountId, r.emergency());
+    }
+
+    @PostMapping("/vaulted-credentials/{accountId}:break-glass")
+    @RequiresPermission(Permissions.EMERGENCY_ACCESS)
+    @RequiresStepUp
+    CheckoutView breakGlass(@PathVariable UUID accountId, @Valid @RequestBody BreakGlassRequest r) {
+        return vault.breakGlass(actors.require(), accountId, r.reason());
+    }
+
+    @GetMapping("/emergency-uses")
+    @RequiresPermission(Permissions.EMERGENCY_REVIEW)
+    List<EmergencyUseView> emergencyUses(@RequestParam(defaultValue = "false") boolean pending) {
+        return vault.emergencyUses(actors.require(), pending);
+    }
+
+    @PostMapping("/emergency-uses/{checkoutId}:review")
+    @RequiresPermission(Permissions.EMERGENCY_REVIEW)
+    void review(@PathVariable UUID checkoutId, @Valid @RequestBody ReviewRequest r) {
+        vault.reviewEmergency(actors.require(), checkoutId, r.note());
     }
 
     @GetMapping("/credential-checkouts")

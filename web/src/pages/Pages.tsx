@@ -102,3 +102,63 @@ export function PlannedPage({ item }: { item: NavItem }) {
     </Stack>
   );
 }
+
+function AuditView({ title, query }: { title: string; query: string }) {
+  const { t } = useLocale();
+  return (
+    <PagedView<AuditEvent & { reason?: string | null; actorIdentityId?: string | null }> path={`/api/v1/audit-events?limit=100&${query}`} title={title}
+      rowKey={(e) => e.id} columns={[
+        { header: t.time, cell: (e) => new Date(e.occurredAt).toLocaleString() },
+        { header: t.action, cell: (e) => <Typography sx={{ fontFamily: 'ui-monospace, monospace', fontSize: 12.5 }}>{e.action}</Typography> },
+        { header: t.object, cell: (e) => [e.objectType, e.objectId].filter(Boolean).join(' / ') },
+        { header: t.actor, cell: (e) => e.actorType + (e.actorIdentityId ? ` ${e.actorIdentityId.substring(0, 8)}` : '') },
+        { header: t.reasonCol, cell: (e) => e.reason ?? '' },
+        { header: t.result, cell: (e) => <Chip size="small" label={e.result} color={statusColor(e.result)} /> },
+      ]} />
+  );
+}
+
+/** Who accessed privileged credentials and what was denied (Phase 7). */
+export function AccessLogsPage() {
+  const { t } = useLocale();
+  return <AuditView title={t.nav.accessLogs} query={`action=${encodeURIComponent('credential.revealed,credential.checked-out,credential.break-glass,credential.checkout-ended,auth.access.denied,credential.redeem')}`} />;
+}
+
+export function PrivilegedActivityPage() {
+  const { t } = useLocale();
+  return <AuditView title={t.nav.privilegedActivity} query={`action=${encodeURIComponent('credential.*,account.operation-requested,access-request.*')}`} />;
+}
+
+export function ConfigurationChangesPage() {
+  const { t } = useLocale();
+  return <AuditView title={t.nav.configurationChanges} query={`objectType=${encodeURIComponent('target,provider-instance,policy,org-unit,role-assignment')}`} />;
+}
+
+interface Setting { group: string; key: string; value: string; description: string }
+
+/** Effective, non-secret configuration of the installation (Phase 7). */
+export function SettingsPage({ group }: { group?: string }) {
+  const { t } = useLocale();
+  const [rows, setRows] = useState<Setting[]>();
+  const [error, setError] = useState<unknown>();
+  useEffect(() => {
+    apiFetch<Setting[]>('/api/v1/system/settings').then((s) => setRows(group ? s.filter((x) => x.group === group) : s), setError);
+  }, [group]);
+  if (error) return <ErrorAlert error={error} />;
+  if (!rows) return <CircularProgress aria-label={t.loading} />;
+  return (
+    <Stack spacing={2}>
+      <Typography variant="body2" color="text.secondary">{t.settingsIntro}</Typography>
+      <DataTable<Setting> title={group ? t.nav.integrations : t.nav.systemSettings} rows={rows} rowKey={(s) => s.key} columns={[
+        { header: t.group, cell: (s) => <Chip size="small" variant="outlined" label={s.group} /> },
+        { header: t.setting, cell: (s) => <Typography sx={{ fontFamily: 'ui-monospace, monospace', fontSize: 12.5 }}>{s.key}</Typography> },
+        { header: t.value, cell: (s) => <strong>{s.value}</strong> },
+        { header: t.description, cell: (s) => s.description },
+      ]} />
+    </Stack>
+  );
+}
+
+export function IntegrationsPage() {
+  return <SettingsPage group="Integrations" />;
+}

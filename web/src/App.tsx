@@ -8,7 +8,7 @@ import { ApiError, apiFetch, startLogin } from './api/client';
 import type { EffectiveAccess } from './api/types';
 import { Shell } from './layout/Shell';
 import { flatten, isAvailable, type NavItem } from './navigation';
-import { AuditPage, HealthPage, PlannedPage, ProvidersPage, RolesPage, TargetsPage } from './pages/Pages';
+import { AccessLogsPage, AuditPage, ConfigurationChangesPage, HealthPage, IntegrationsPage, PlannedPage, PrivilegedActivityPage, ProvidersPage, RolesPage, SettingsPage, TargetsPage } from './pages/Pages';
 import { UsersPage } from './pages/Users';
 import { OrgUnitsPage } from './pages/OrgUnits';
 import { AccessRequestsPage, ApprovalsPage, PoliciesPage } from './pages/Requests';
@@ -18,6 +18,7 @@ import { MeContext } from './MeContext';
 import { ErrorAlert } from './pages/common';
 import { DatabasesPage, ServersPage } from './pages/Servers';
 import { CredentialRequestsPage, MyCheckoutsPage, VaultPage } from './pages/Vault';
+import { ActiveEmergenciesPage, EmergencyAccountsPage, EmergencyUsesPage } from './pages/Emergency';
 import { AllAccountsPage, LinuxAccountsPage, PrivilegedAccountsPage, ServiceAccountsPage, WindowsAccountsPage } from './pages/Accounts';
 
 const PAGES: Record<string, () => React.JSX.Element> = {
@@ -47,6 +48,18 @@ const PAGES: Record<string, () => React.JSX.Element> = {
   pamRequests: CredentialRequestsPage,
   myCheckouts: MyCheckoutsPage,
   pamApprovals: ApprovalsPage,
+  emergencyAccountsList: EmergencyAccountsPage,
+  emergencyAccounts: EmergencyAccountsPage,
+  emergencyAccess: EmergencyAccountsPage,
+  emergencyRequests: EmergencyAccountsPage,
+  activeEmergencies: ActiveEmergenciesPage,
+  emergencyAudit: () => <EmergencyUsesPage />,
+  emergencyApprovals: () => <EmergencyUsesPage />,
+  accessLogs: AccessLogsPage,
+  privilegedActivity: PrivilegedActivityPage,
+  configurationChanges: ConfigurationChangesPage,
+  systemSettings: () => <SettingsPage />,
+  integrations: IntegrationsPage,
 };
 
 function routeElement(item: NavItem) {

@@ -77,16 +77,80 @@ class NotificationConfiguration {
     }
 
     @Bean
-    NotificationListeners notificationListeners(NotificationService service) {
-        return new NotificationListeners(service);
+    WeeklyReportJob weeklyReportJob(NotificationService service, com.enterprise.iam.core.authorization.api.RoleDirectory roles,
+                                    org.springframework.jdbc.core.simple.JdbcClient jdbc, Clock clock) {
+        return new WeeklyReportJob(service, roles, jdbc, clock);
+    }
+
+    /**
+     * Weekly security summary e-mail (Phase 7). Read-only counts across schemas, the reporting pattern used for exports;
+     * nothing is written except the outbox rows of the e-mails.
+     */
+    static class WeeklyReportJob {
+        private final NotificationService service;
+        private final com.enterprise.iam.core.authorization.api.RoleDirectory roles;
+        private final org.springframework.jdbc.core.simple.JdbcClient jdbc;
+        private final Clock clock;
+
+        WeeklyReportJob(NotificationService service, com.enterprise.iam.core.authorization.api.RoleDirectory roles,
+                        org.springframework.jdbc.core.simple.JdbcClient jdbc, Clock clock) {
+            this.service = service;
+            this.roles = roles;
+            this.jdbc = jdbc;
+            this.clock = clock;
+        }
+
+        @org.springframework.scheduling.annotation.Scheduled(cron = "${iam.reports.weekly-cron:0 0 7 * * MON}")
+        void send() {
+            java.time.LocalDate today = java.time.LocalDate.now(clock);
+            java.util.Map<String, String> f = new java.util.HashMap<>();
+            f.put("period", today.minusDays(7) + " – " + today);
+            f.put("targets", count("SELECT count(*) FROM target.target WHERE status <> 'DECOMMISSIONED'"));
+            f.put("privileged", count("SELECT count(*) FROM account.account a JOIN target.target t ON t.id = a.target_id "
+                    + "WHERE a.privileged AND a.native_status <> 'ABSENT' AND t.status <> 'DECOMMISSIONED'"));
+            f.put("vaulted", count("SELECT count(*) FROM account.managed_account WHERE secret_path IS NOT NULL"));
+            f.put("unverified", count("SELECT count(*) FROM account.managed_account WHERE secret_path IS NOT NULL AND rotation_status <> 'VERIFIED'"));
+            f.put("findings", count("SELECT count(*) FROM account.account_finding WHERE resolved_at IS NULL"));
+            f.put("emergencyPending", count("SELECT count(*) FROM account.credential_checkout WHERE emergency AND review_status = 'PENDING'"));
+            f.put("reveals", count("SELECT coalesce(sum(reveal_count), 0) FROM account.credential_checkout WHERE started_at > now() - interval '7 days'"));
+            f.put("failedOps", count("SELECT count(*) FROM operation.operation WHERE status IN ('FAILED','UNKNOWN','TIMEOUT','PARTIAL') "
+                    + "AND created_at > now() - interval '7 days'"));
+            f.put("pendingRequests", count("SELECT count(*) FROM request.access_request WHERE status = 'PENDING_APPROVAL'"));
+            java.util.Set<java.util.UUID> to = new java.util.LinkedHashSet<>(roles.activeHolders("SECURITY_ADMINISTRATOR"));
+            to.addAll(roles.activeHolders("PLATFORM_ADMINISTRATOR"));
+            service.weeklyReport(to, f);
+        }
+
+        private String count(String sql) {
+            try {
+                return String.valueOf(jdbc.sql(sql).query(Long.class).single());
+            } catch (RuntimeException e) {
+                return "n/a";
+            }
+        }
+    }
+
+    @Bean
+    NotificationListeners notificationListeners(NotificationService service, com.enterprise.iam.core.authorization.api.RoleDirectory roles) {
+        return new NotificationListeners(service, roles);
     }
 
     /** Synchronous listeners: outbox rows commit or roll back with the originating change. */
     static class NotificationListeners {
         private final NotificationService service;
+        private final com.enterprise.iam.core.authorization.api.RoleDirectory roles;
 
-        NotificationListeners(NotificationService service) {
+        NotificationListeners(NotificationService service, com.enterprise.iam.core.authorization.api.RoleDirectory roles) {
             this.service = service;
+            this.roles = roles;
+        }
+
+        /** Break-glass: security administrators (and platform administrators) are told immediately. */
+        @EventListener
+        void onEmergency(com.enterprise.iam.core.account.api.EmergencyAccessUsed e) {
+            java.util.Set<java.util.UUID> reviewers = new java.util.LinkedHashSet<>(roles.activeHolders("SECURITY_ADMINISTRATOR"));
+            reviewers.addAll(roles.activeHolders("PLATFORM_ADMINISTRATOR"));
+            service.onEmergency(e, reviewers);
         }
 
         @EventListener

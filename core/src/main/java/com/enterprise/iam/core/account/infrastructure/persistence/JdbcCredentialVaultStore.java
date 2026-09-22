@@ -125,6 +125,43 @@ public class JdbcCredentialVaultStore implements CredentialVaultStore {
                 .query(JdbcCredentialVaultStore::checkout).list();
     }
 
+    @Override
+    public boolean isEmergency(UUID accountId) {
+        return jdbc.sql("SELECT emergency FROM account.managed_account WHERE account_id = :a").param("a", accountId).query(Boolean.class)
+                .optional().orElse(false);
+    }
+
+    @Override
+    public void setEmergency(UUID accountId, boolean emergency) {
+        jdbc.sql("UPDATE account.managed_account SET emergency = :e, updated_at = now() WHERE account_id = :a")
+                .param("e", emergency).param("a", accountId).update();
+    }
+
+    @Override
+    public void markEmergencyCheckout(UUID checkoutId) {
+        jdbc.sql("UPDATE account.credential_checkout SET emergency = true, review_status = 'PENDING' WHERE id = :id").param("id", checkoutId).update();
+    }
+
+    @Override
+    public List<Checkout> emergencyCheckouts(boolean pendingOnly, int limit) {
+        return jdbc.sql(CHECKOUT + " WHERE emergency" + (pendingOnly ? " AND review_status = 'PENDING'" : "") + " ORDER BY started_at DESC LIMIT :l")
+                .param("l", limit).query(JdbcCredentialVaultStore::checkout).list();
+    }
+
+    @Override
+    public Optional<EmergencyReview> emergencyReview(UUID checkoutId) {
+        return jdbc.sql("SELECT id, review_status, reviewed_by, reviewed_at, review_note FROM account.credential_checkout WHERE id = :id AND emergency")
+                .param("id", checkoutId).query((rs, n) -> new EmergencyReview(rs.getObject("id", UUID.class), rs.getString("review_status"),
+                        rs.getObject("reviewed_by", UUID.class), instant(rs.getTimestamp("reviewed_at")), rs.getString("review_note"))).optional();
+    }
+
+    @Override
+    public boolean reviewEmergency(UUID checkoutId, UUID reviewedBy, String note, Instant at) {
+        return jdbc.sql("UPDATE account.credential_checkout SET review_status = 'REVIEWED', reviewed_by = :by, reviewed_at = :at, review_note = :note "
+                        + "WHERE id = :id AND emergency AND review_status = 'PENDING'")
+                .param("by", reviewedBy).param("at", ts(at)).param("note", note).param("id", checkoutId).update() == 1;
+    }
+
     private static Vaulted vaulted(ResultSet rs, int n) throws SQLException {
         int interval = rs.getInt("rotation_interval_days");
         Integer intervalDays = rs.wasNull() ? null : interval;

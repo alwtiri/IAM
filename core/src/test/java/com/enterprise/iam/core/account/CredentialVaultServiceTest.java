@@ -132,6 +132,49 @@ class CredentialVaultServiceTest {
         public List<Checkout> overdue(Instant now) {
             return checkouts.values().stream().filter(c -> "ACTIVE".equals(c.status()) && !c.notAfter().isAfter(now)).toList();
         }
+
+        final java.util.Set<UUID> emergencyAccounts = new java.util.HashSet<>();
+        final Map<UUID, EmergencyReview> reviews = new LinkedHashMap<>();
+
+        @Override
+        public boolean isEmergency(UUID accountId) {
+            return emergencyAccounts.contains(accountId);
+        }
+
+        @Override
+        public void setEmergency(UUID accountId, boolean emergency) {
+            if (emergency) {
+                emergencyAccounts.add(accountId);
+            } else {
+                emergencyAccounts.remove(accountId);
+            }
+        }
+
+        @Override
+        public void markEmergencyCheckout(UUID checkoutId) {
+            reviews.put(checkoutId, new EmergencyReview(checkoutId, "PENDING", null, null, null));
+        }
+
+        @Override
+        public List<Checkout> emergencyCheckouts(boolean pendingOnly, int limit) {
+            return checkouts.values().stream().filter(c -> reviews.containsKey(c.id())
+                    && (!pendingOnly || "PENDING".equals(reviews.get(c.id()).status()))).toList();
+        }
+
+        @Override
+        public Optional<EmergencyReview> emergencyReview(UUID checkoutId) {
+            return Optional.ofNullable(reviews.get(checkoutId));
+        }
+
+        @Override
+        public boolean reviewEmergency(UUID checkoutId, UUID reviewedBy, String note, Instant at) {
+            EmergencyReview r = reviews.get(checkoutId);
+            if (r == null || !"PENDING".equals(r.status())) {
+                return false;
+            }
+            reviews.put(checkoutId, new EmergencyReview(checkoutId, "REVIEWED", reviewedBy, at, note));
+            return true;
+        }
     }
 
     /** Vault with versions per path; values are kept so reveal can be checked. */
@@ -311,5 +354,23 @@ class CredentialVaultServiceTest {
         assertTrue(vault.checkoutTargets().isEmpty() || vault.checkoutTargets().stream().noneMatch(t -> t.accountId().equals(root.id()) && t.available()));
         vault.manage(TestSupport.actor(admin), root.id(), "again");
         assertEquals("ROTATING", store.rows.get(root.id()).rotationStatus());
+    }
+
+    @Test
+    void breakGlassNeedsAnEmergencyAccountNotifiesAndIsReviewedBySomeoneElse() {
+        vault.manage(TestSupport.actor(admin), root.id(), null);
+        complete("SUCCESS");
+        assertThrows(IamException.class, () -> vault.breakGlass(TestSupport.actor(alice), root.id(), "database down, need root now"), "not marked");
+        vault.setEmergency(TestSupport.actor(admin), root.id(), true);
+        assertThrows(IamException.class, () -> vault.breakGlass(TestSupport.actor(alice), root.id(), "short"), "reason too short");
+        CheckoutView c = vault.breakGlass(TestSupport.actor(alice), root.id(), "database down, need root now");
+        assertEquals("ACTIVE", c.status());
+        assertEquals(now.plus(CredentialVaultService.BREAK_GLASS_DURATION), c.notAfter());
+        assertTrue(events.stream().anyMatch(e -> e instanceof com.enterprise.iam.core.account.api.EmergencyAccessUsed));
+        assertEquals(1, vault.emergencyUses(TestSupport.actor(admin), true).size());
+        assertThrows(IamException.class, () -> vault.reviewEmergency(TestSupport.actor(alice), c.id(), "ok"), "no self-review");
+        vault.reviewEmergency(TestSupport.actor(admin), c.id(), "justified: incident INC-7");
+        assertEquals(0, vault.emergencyUses(TestSupport.actor(admin), true).size());
+        assertEquals("REVIEWED", vault.emergencyUses(TestSupport.actor(admin), false).get(0).reviewStatus());
     }
 }

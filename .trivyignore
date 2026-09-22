@@ -1,0 +1,3 @@
+# Accepted image findings (ADR-0022). One CVE per line with an expiry comment and the reason; reviewed every release.
+# Example:
+# CVE-2099-0000  # exp:2026-12-31 not reachable: library present in base image, never loaded

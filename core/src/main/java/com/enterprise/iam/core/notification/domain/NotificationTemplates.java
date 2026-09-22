@@ -32,6 +32,20 @@ public final class NotificationTemplates {
                             + "Open the platform: Identity & Access > Approvals.\n\nReference: {{reference}}\n"),
             "access-request.decided", new Template("Your access request for {{role}}: {{status}}",
                     "Hello {{displayName}},\n\nYour request for the role {{role}} is now {{status}}.\n{{reason}}\n\nReference: {{reference}}\n"),
+            "report.weekly", new Template("Weekly security summary — {{period}}",
+                    "Hello {{displayName}},\n\nSecurity summary for {{period}}:\n\n"
+                            + "  Managed servers and databases:  {{targets}}\n"
+                            + "  Privileged accounts:            {{privileged}}\n"
+                            + "  Vaulted passwords:              {{vaulted}} ({{unverified}} not verified)\n"
+                            + "  Open findings:                  {{findings}}\n"
+                            + "  Emergency uses to review:       {{emergencyPending}}\n"
+                            + "  Password reveals (7 days):      {{reveals}}\n"
+                            + "  Operations needing attention:   {{failedOps}}\n"
+                            + "  Access requests waiting:        {{pendingRequests}}\n\n"
+                            + "Open the platform for details: Dashboard and Reports.\n"),
+            "emergency.used", new Template("EMERGENCY ACCESS: {{account}} opened by {{user}}",
+                    "Hello {{displayName}},\n\n{{user}} used break-glass access on {{account}} until {{until}}.\nReason: {{reason}}\n\n"
+                            + "Review it in the platform: Emergency Access > Emergency Audit.\n\nReference: {{reference}}\n"),
             "identity.lifecycle", new Template("Identity {{username}} is now {{state}}",
                     "Hello {{displayName}},\n\nYour identity {{username}} changed from {{from}} to {{state}}.\nReason: {{reason}}\n\n"
                             + "Reference: {{reference}}\n"));

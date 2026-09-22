@@ -3,6 +3,8 @@ package com.enterprise.iam.core.account.application;
 import com.enterprise.iam.core.account.api.CheckoutView;
 import com.enterprise.iam.core.account.api.CredentialCheckoutEnded;
 import com.enterprise.iam.core.account.api.CredentialCheckouts;
+import com.enterprise.iam.core.account.api.EmergencyAccessUsed;
+import com.enterprise.iam.core.account.api.EmergencyUseView;
 import com.enterprise.iam.core.account.api.RevealedCredential;
 import com.enterprise.iam.core.account.api.VaultedCredentialView;
 import com.enterprise.iam.core.account.application.CredentialVaultStore.Checkout;
@@ -54,6 +56,7 @@ import java.util.UUID;
 public class CredentialVaultService implements CredentialCheckouts {
 
     public static final Duration MAX_CHECKOUT = Duration.ofHours(72);
+    public static final Duration BREAK_GLASS_DURATION = Duration.ofHours(4);
     static final Duration ROTATION_TIMEOUT = Duration.ofMinutes(3);
     static final Duration HANDLE_TTL = Duration.ofMinutes(10);
     private static final CurrentActor SYSTEM = CurrentActor.system(SystemIdentities.SYSTEM_IDENTITY_ID);
@@ -356,6 +359,74 @@ public class CredentialVaultService implements CredentialCheckouts {
         }
     }
 
+    // ------------------------------------------------------------------ emergency (break-glass) access
+
+    /** Marks a vaulted account as an emergency account (or clears the mark). */
+    public VaultedCredentialView setEmergency(CurrentActor actor, UUID accountId, boolean emergency) {
+        tx.run(() -> {
+            AccountStore.Scoped s = scoped(accountId);
+            guard.require(actor, Permissions.CREDENTIAL_MANAGE, AccountService.scope(s), true);
+            store.find(accountId).filter(v -> v.secretPath() != null).orElseThrow(() -> IamException.notFound("Vaulted credential"));
+            store.setEmergency(accountId, emergency);
+            audit.record(actor, new AuditEntry(emergency ? "credential.emergency-marked" : "credential.emergency-unmarked", "account",
+                    accountId.toString(), s.account().targetId(), AuditEntry.Result.SUCCESS, null, s.account().providerInstanceId(), Map.of()));
+        });
+        return get(actor, accountId);
+    }
+
+    /**
+     * Break-glass: an authorised person checks out an emergency account immediately, without approval, for a short fixed
+     * time. Security is notified at once and the use stays PENDING review; the password is rotated when it ends.
+     */
+    public CheckoutView breakGlass(CurrentActor actor, UUID accountId, String reason) {
+        if (reason == null || reason.strip().length() < 10) {
+            throw IamException.validation("reason", "REQUIRED", "describe the emergency (at least 10 characters)");
+        }
+        AccountStore.Scoped s = tx.readOnly(() -> scoped(accountId));
+        guard.require(actor, Permissions.EMERGENCY_ACCESS, AccountService.scope(s), true);
+        if (!tx.readOnly(() -> store.isEmergency(accountId))) {
+            throw IamException.validation("accountId", "NOT_EMERGENCY", "this account is not marked as an emergency account");
+        }
+        UUID id = open(actor, accountId, actor.identityId(), null, BREAK_GLASS_DURATION, "BREAK-GLASS: " + reason.strip());
+        tx.run(() -> {
+            store.markEmergencyCheckout(id);
+            Checkout c = store.findCheckout(id).orElseThrow();
+            audit.record(actor, new AuditEntry("credential.break-glass", "account", accountId.toString(), s.account().targetId(),
+                    AuditEntry.Result.SUCCESS, reason.strip(), s.account().providerInstanceId(), Map.of("checkout", id.toString(),
+                    "until", c.notAfter().toString())));
+            events.publish(new EmergencyAccessUsed(id, accountId, s.account().name() + " @ " + s.targetName(), actor.identityId(),
+                    name(actor.identityId()), reason.strip(), c.notAfter()));
+        });
+        return tx.readOnly(() -> view(store.findCheckout(id).orElseThrow()));
+    }
+
+    public List<EmergencyUseView> emergencyUses(CurrentActor actor, boolean pendingOnly) {
+        guard.require(actor, Permissions.EMERGENCY_REVIEW, ResourceScope.PLATFORM, false);
+        return tx.readOnly(() -> store.emergencyCheckouts(pendingOnly, LIST_LIMIT).stream().map(c -> {
+            var r = store.emergencyReview(c.id()).orElse(null);
+            return new EmergencyUseView(view(c), r == null ? "PENDING" : r.status(), r == null ? null : r.reviewedBy(),
+                    r == null ? null : name(r.reviewedBy()), r == null ? null : r.reviewedAt(), r == null ? null : r.note());
+        }).toList());
+    }
+
+    /** A second person confirms the emergency use was justified (the user of the break-glass cannot review it). */
+    public void reviewEmergency(CurrentActor actor, UUID checkoutId, String note) {
+        guard.require(actor, Permissions.EMERGENCY_REVIEW, ResourceScope.PLATFORM, false);
+        if (note == null || note.isBlank()) {
+            throw IamException.validation("note", "REQUIRED", "a review note is required");
+        }
+        tx.run(() -> {
+            Checkout c = store.findCheckout(checkoutId).orElseThrow(() -> IamException.notFound("Checkout"));
+            if (c.identityId().equals(actor.identityId())) {
+                throw IamException.validation("checkoutId", "SELF_REVIEW", "the person who used the emergency access cannot review it");
+            }
+            if (!store.reviewEmergency(checkoutId, actor.identityId(), note.strip(), clock.instant())) {
+                throw IamException.invalidTransition("EmergencyUse", "REVIEWED", "REVIEW");
+            }
+            audit.record(actor, AuditEntry.success("credential.break-glass-reviewed", "account", c.accountId(), Map.of("checkout", checkoutId.toString())));
+        });
+    }
+
     // ------------------------------------------------------------------ queries
 
     public List<VaultedCredentialView> list(CurrentActor actor) {
@@ -417,7 +488,7 @@ public class CredentialVaultService implements CredentialCheckouts {
         CheckoutView active = store.activeCheckout(v.accountId()).map(this::view).orElse(null);
         return new VaultedCredentialView(v.accountId(), s.account().name(), s.account().targetId(), s.targetName(), s.providerType(),
                 s.account().privileged(), v.rotationStatus(), v.rotationTrigger(), v.lastRotatedAt(), v.lastError(), v.rotationOperationId(),
-                v.lastRotatedAt() == null ? null : v.lastRotatedAt().plus(interval), active);
+                v.lastRotatedAt() == null ? null : v.lastRotatedAt().plus(interval), active, store.isEmergency(v.accountId()));
     }
 
     private CheckoutView view(Checkout c) {

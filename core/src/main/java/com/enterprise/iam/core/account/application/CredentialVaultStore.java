@@ -46,4 +46,21 @@ public interface CredentialVaultStore {
     List<Checkout> recentCheckouts(int limit);
 
     List<Checkout> overdue(Instant now);
+
+    /** Review state of a break-glass checkout. */
+    record EmergencyReview(UUID checkoutId, String status, UUID reviewedBy, Instant reviewedAt, String note) {
+    }
+
+    boolean isEmergency(UUID accountId);
+
+    void setEmergency(UUID accountId, boolean emergency);
+
+    /** Marks a checkout as break-glass (review PENDING). */
+    void markEmergencyCheckout(UUID checkoutId);
+
+    List<Checkout> emergencyCheckouts(boolean pendingOnly, int limit);
+
+    Optional<EmergencyReview> emergencyReview(UUID checkoutId);
+
+    boolean reviewEmergency(UUID checkoutId, UUID reviewedBy, String note, Instant at);
 }

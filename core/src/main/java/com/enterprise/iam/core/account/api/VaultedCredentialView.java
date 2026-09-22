@@ -10,5 +10,6 @@ import java.util.UUID;
  */
 public record VaultedCredentialView(UUID accountId, String accountName, UUID targetId, String targetName, String providerType,
                                     boolean privileged, String rotationStatus, String rotationTrigger, Instant lastRotatedAt,
-                                    String lastRotationError, UUID rotationOperationId, Instant nextRotationAt, CheckoutView activeCheckout) {
+                                    String lastRotationError, UUID rotationOperationId, Instant nextRotationAt, CheckoutView activeCheckout,
+                                    boolean emergency) {
 }

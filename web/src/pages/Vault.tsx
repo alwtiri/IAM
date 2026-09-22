@@ -36,6 +36,7 @@ export interface VaultedCredential {
   lastRotationError: string | null;
   nextRotationAt: string | null;
   activeCheckout: Checkout | null;
+  emergency?: boolean;
 }
 
 interface RequestableCredential {
@@ -244,7 +245,7 @@ export function VaultPage() {
           {actionError !== undefined && <ErrorAlert error={actionError} />}
           {rows.length === 0 ? <Alert severity="info">{t.noVaulted}</Alert> : (
             <DataTable<VaultedCredential> hideTitle title={t.nav.passwordVault} rows={rows} rowKey={(v) => v.accountId} columns={[
-              { header: t.name, cell: (v) => v.accountName },
+              { header: t.name, cell: (v) => <Stack direction="row" spacing={1} alignItems="center"><span>{v.accountName}</span>{v.emergency && <Chip size="small" color="error" label={t.emergencyTag} />}</Stack> },
               { header: t.server, cell: (v) => v.targetName },
               {
                 header: t.rotationStatus, cell: (v) => (
@@ -265,6 +266,10 @@ export function VaultPage() {
                     <Button size="small" disabled={!!v.activeCheckout || v.rotationStatus === 'ROTATING'} onClick={() => rotate(v)}>{t.rotateNow}</Button>
                     <Button size="small" variant="outlined" disabled={!!v.activeCheckout || v.rotationStatus !== 'VERIFIED' && v.rotationStatus !== 'UNKNOWN'}
                       onClick={() => setCheckout(v)}>{t.checkOut}</Button>
+                    <Button size="small" onClick={() => {
+                      apiFetch(`/api/v1/vaulted-credentials/${v.accountId}:mark-emergency`, { method: 'POST', body: JSON.stringify({ emergency: !v.emergency }) })
+                        .then(load, setActionError);
+                    }}>{v.emergency ? t.unmarkEmergency : t.markEmergency}</Button>
                     <Button size="small" color="error" disabled={!!v.activeCheckout || v.rotationStatus === 'ROTATING'}
                       onClick={() => setRemoving(v)}>{t.removeFromVault}</Button>
                   </Stack>

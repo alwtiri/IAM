@@ -110,6 +110,10 @@ iam:
     interval: PT1M
   accounts:
     dormant-after-days: ${IAM_ACCOUNTS_DORMANT_DAYS:90}
+  siem:
+    # HTTPS endpoint that receives the audit trail (JSON batches signed with HMAC-SHA256); empty = off
+    webhook-url: ${IAM_SIEM_WEBHOOK_URL:}
+    webhook-secret: ${IAM_SIEM_WEBHOOK_SECRET:}
   operations:
     # One durable queue per provider type (G4); must match the worker pools.
     provider-types: linux-ssh,active-directory,windows-winrm,generic-rest,postgresql

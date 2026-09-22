@@ -85,6 +85,8 @@ services:
       SPRING_MAIL_PORT: "1025"
       # Internal mTLS listener on 8443 (core network only, never published) for worker credential-handle redemption.
       IAM_INTERNAL_API_ENABLED: "true"
+      IAM_SIEM_WEBHOOK_URL: ${IAM_SIEM_WEBHOOK_URL:-}
+      IAM_SIEM_WEBHOOK_SECRET: ${IAM_SIEM_WEBHOOK_SECRET:-}
     # Secret values are read from /run/secrets via Spring's configtree (file name = property name).
     secrets:
       - source: iam_app_password

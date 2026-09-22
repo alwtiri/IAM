@@ -45,7 +45,7 @@ export const NAVIGATION: NavItem[] = [
       leaf('windowsAccounts', '/accounts/windows', 3),
       leaf('serviceAccountsList', '/accounts/service', 3),
       leaf('privilegedAccounts', '/accounts/privileged', 3),
-      leaf('emergencyAccounts', '/accounts/emergency', 6),
+      leaf('emergencyAccounts', '/accounts/emergency', 4),
     ],
   },
   {
@@ -57,7 +57,7 @@ export const NAVIGATION: NavItem[] = [
       leaf('privilegedSessions', '/pam/sessions', 6),
       leaf('sshAccess', '/pam/ssh', 6),
       leaf('rdpAccess', '/pam/rdp', 6),
-      leaf('emergencyAccess', '/pam/emergency', 6),
+      leaf('emergencyAccess', '/pam/emergency', 4),
     ],
   },
   {
@@ -68,20 +68,20 @@ export const NAVIGATION: NavItem[] = [
     ],
   },
   {
-    id: 'emergency', path: '/emergency', phase: 6, children: [
-      leaf('emergencyAccountsList', '/emergency/accounts', 6),
-      leaf('emergencyRequests', '/emergency/requests', 6),
-      leaf('emergencyApprovals', '/emergency/approvals', 6),
-      leaf('activeEmergencies', '/emergency/active', 6),
-      leaf('emergencyAudit', '/emergency/audit', 6),
+    id: 'emergency', path: '/emergency', phase: 4, children: [
+      leaf('emergencyAccountsList', '/emergency/accounts', 4),
+      leaf('emergencyRequests', '/emergency/requests', 4),
+      leaf('emergencyApprovals', '/emergency/approvals', 4),
+      leaf('activeEmergencies', '/emergency/active', 4),
+      leaf('emergencyAudit', '/emergency/audit', 4),
     ],
   },
   {
     id: 'auditCompliance', path: '/audit', phase: 2, children: [
       leaf('auditLogs', '/audit/logs', 2, 'audit:read'),
-      leaf('accessLogs', '/audit/access', 7),
-      leaf('privilegedActivity', '/audit/privileged', 6),
-      leaf('configurationChanges', '/audit/configuration', 7),
+      leaf('accessLogs', '/audit/access', 4),
+      leaf('privilegedActivity', '/audit/privileged', 4),
+      leaf('configurationChanges', '/audit/configuration', 4),
     ],
   },
   leaf('reports', '/reports', 4),
@@ -92,10 +92,10 @@ export const NAVIGATION: NavItem[] = [
       leaf('securitySettings', '/admin/security', 9),
       leaf('authentication', '/admin/authentication', 9),
       leaf('notifications', '/admin/notifications', 8),
-      leaf('integrations', '/admin/integrations', 8),
+      leaf('integrations', '/admin/integrations', 4),
       leaf('providerManagement', '/admin/providers', 2, 'provider:read'),
       leaf('systemHealth', '/admin/health', 2, 'system:health:read'),
-      leaf('systemSettings', '/admin/settings', 7),
+      leaf('systemSettings', '/admin/settings', 4),
     ],
   },
 ];

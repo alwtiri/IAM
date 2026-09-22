@@ -2682,6 +2682,163 @@ paths:
                   type: integer
                   minimum: 1
                   maximum: 72
+  /api/v1/vaulted-credentials/{id}:mark-emergency:
+    post:
+      tags:
+      - vault
+      operationId: markEmergency
+      summary: Mark or unmark an emergency account
+      x-iam-phase: 6
+      x-iam-permission: credential:manage
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                emergency:
+                  type: boolean
+  /api/v1/vaulted-credentials/{id}:break-glass:
+    post:
+      tags:
+      - vault
+      operationId: breakGlass
+      summary: Break-glass checkout for 4 hours (step-up; security notified; reviewed afterwards)
+      x-iam-phase: 6
+      x-iam-permission: emergency:access
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - reason
+              properties:
+                reason:
+                  type: string
+                  minLength: 10
+                  maxLength: 500
+  /api/v1/emergency-uses:
+    get:
+      tags:
+      - vault
+      operationId: listEmergencyUses
+      summary: Break-glass uses with review state
+      x-iam-phase: 6
+      x-iam-permission: emergency:review
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - name: pending
+        in: query
+        schema:
+          type: boolean
+          default: false
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/emergency-uses/{id}:review:
+    post:
+      tags:
+      - vault
+      operationId: reviewEmergencyUse
+      summary: Review a break-glass use (not by its user)
+      x-iam-phase: 6
+      x-iam-permission: emergency:review
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - note
+              properties:
+                note:
+                  type: string
+                  maxLength: 1000
+  /api/v1/system/settings:
+    get:
+      tags:
+      - system
+      operationId: systemSettings
+      summary: Effective non-secret settings
+      x-iam-phase: 7
+      x-iam-permission: system:read
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
 components:
   securitySchemes:
     bffSession:

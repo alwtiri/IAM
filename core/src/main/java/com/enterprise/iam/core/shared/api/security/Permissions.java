@@ -38,6 +38,8 @@ public final class Permissions {
     public static final String SOD_READ = "sod:read";
     public static final String REQUEST_READ = "request:read";
     public static final String CREDENTIAL_MANAGE = "credential:manage";
+    public static final String EMERGENCY_ACCESS = "emergency:access";
+    public static final String EMERGENCY_REVIEW = "emergency:review";
 
     /** All permission codes, in catalog order. */
     public static final List<String> ALL = List.of(
@@ -46,7 +48,7 @@ public final class Permissions {
             ROLE_READ, ROLE_ASSIGNMENT_READ, ROLE_ASSIGNMENT_WRITE, AUDIT_READ, AUDIT_VERIFY,
             OPERATION_READ, TARGET_READ, TARGET_WRITE, PROVIDER_READ, PROVIDER_WRITE,
             ACCOUNT_READ, ACCOUNT_WRITE, ACCOUNT_DISCOVER, ACCOUNT_FINDING_RESOLVE, OPERATION_EXECUTE,
-            POLICY_READ, POLICY_WRITE, SOD_READ, REQUEST_READ, CREDENTIAL_MANAGE);
+            POLICY_READ, POLICY_WRITE, SOD_READ, REQUEST_READ, CREDENTIAL_MANAGE, EMERGENCY_ACCESS, EMERGENCY_REVIEW);
 
     private Permissions() {
     }
