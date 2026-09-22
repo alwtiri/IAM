@@ -229,13 +229,7 @@ function ConnectDialog({ server, onClose, onConnected }: { server: Target; onClo
   const [saving, setSaving] = useState(false);
 
   if (server.type !== 'LINUX_SERVER') {
-    return (
-      <Dialog open onClose={onClose}>
-        <DialogTitle>{t.addConnection}</DialogTitle>
-        <DialogContent><Alert severity="info">{t.winrmPending}</Alert></DialogContent>
-        <DialogActions><Button onClick={onClose}>{t.cancel}</Button></DialogActions>
-      </Dialog>
-    );
+    return <WinRmConnectDialog server={server} onClose={onClose} onConnected={onConnected} />;
   }
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -291,3 +285,51 @@ function ConnectDialog({ server, onClose, onConnected }: { server: Target; onClo
   );
 }
 
+
+/** WinRM (HTTPS + Basic) connection for a Windows server; the password goes straight to Vault. */
+function WinRmConnectDialog({ server, onClose, onConnected }: { server: Target; onClose: () => void; onConnected: () => void }) {
+  const { t } = useLocale();
+  const [form, setForm] = useState({ host: server.hostname ?? '', port: '5986', username: 'svc-iam', secret: '', pinnedCertificateSha256: '' });
+  const [error, setError] = useState<unknown>();
+  const [saving, setSaving] = useState(false);
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
+  const save = async () => {
+    setSaving(true);
+    try {
+      const settings: Record<string, string> = { username: form.username };
+      if (form.pinnedCertificateSha256.trim()) settings.pinnedCertificateSha256 = form.pinnedCertificateSha256.trim();
+      const instance = await apiFetch<ProviderInstance>('/api/v1/provider-instances', {
+        method: 'POST',
+        body: JSON.stringify({ type: 'windows-winrm', name: `${server.name}-winrm`, endpoint: `https://${form.host}:${form.port}/wsman`, settings, credential: form.secret }),
+      });
+      await apiFetch(`/api/v1/targets/${server.id}/provider-bindings`, { method: 'POST', body: JSON.stringify({ providerInstanceId: instance.id }) });
+      onConnected();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{t.addConnection} — WinRM (HTTPS)</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          {error !== undefined && <ErrorAlert error={error} />}
+          <Alert severity="info">{t.winrmHint}</Alert>
+          <Stack direction="row" spacing={2}>
+            <TextField required fullWidth label={t.hostname} value={form.host} onChange={set('host')} />
+            <TextField label={t.port} value={form.port} onChange={set('port')} sx={{ width: 120 }} />
+          </Stack>
+          <TextField required label={t.serviceAccount} value={form.username} onChange={set('username')} helperText="HOST\\svc-iam" />
+          <TextField required label={t.password} type="password" value={form.secret} onChange={set('secret')} autoComplete="off" />
+          <TextField label={t.certificatePin} value={form.pinnedCertificateSha256} onChange={set('pinnedCertificateSha256')} />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{t.cancel}</Button>
+        <Button variant="contained" disabled={saving || !form.host || !form.username || !form.secret} onClick={() => void save()}>{t.save}</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}

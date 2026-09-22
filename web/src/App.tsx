@@ -10,6 +10,7 @@ import { Shell } from './layout/Shell';
 import { flatten, isAvailable, type NavItem } from './navigation';
 import { AuditPage, HealthPage, PlannedPage, ProvidersPage, RolesPage, TargetsPage } from './pages/Pages';
 import { UsersPage } from './pages/Users';
+import { OrgUnitsPage } from './pages/OrgUnits';
 import { DashboardPage } from './pages/Dashboard';
 import { MeContext } from './MeContext';
 import { ErrorAlert } from './pages/common';
@@ -26,6 +27,7 @@ const PAGES: Record<string, () => React.JSX.Element> = {
   allTargets: TargetsPage,
   providerManagement: ProvidersPage,
   servers: ServersPage,
+  directory: OrgUnitsPage,
   allAccounts: AllAccountsPage,
   privilegedAccounts: PrivilegedAccountsPage,
   linuxAccounts: LinuxAccountsPage,

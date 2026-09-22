@@ -18,6 +18,7 @@ dependencies {
     runtimeOnly(project(":providers:generic-rest"))
     runtimeOnly(project(":providers:linux-ssh"))
     runtimeOnly(project(":providers:active-directory"))
+    runtimeOnly(project(":providers:windows-winrm"))
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
