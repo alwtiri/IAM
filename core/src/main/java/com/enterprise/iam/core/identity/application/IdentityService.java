@@ -143,6 +143,11 @@ public class IdentityService implements IdentityDirectory {
         return store.summary(identityId);
     }
 
+    @Override
+    public Optional<IdentitySummary> findByUsername(String username) {
+        return username == null || username.isBlank() ? Optional.empty() : store.identityIdByUsername(username).flatMap(store::summary);
+    }
+
     static IdentityView view(Identity i, String displayName, boolean platformUser) {
         return new IdentityView(i.id(), i.personId(), displayName, i.type().name(), i.username(), i.state().name(), i.stateReason(),
                 i.validFrom(), i.validUntil(), platformUser, i.version());

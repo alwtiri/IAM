@@ -98,6 +98,11 @@ final class MemoryIdentityStore implements IdentityStore {
     }
 
     @Override
+    public Optional<UUID> identityIdByUsername(String username) {
+        return identities.values().stream().filter(i -> i.username().equals(username)).map(Identity::id).findFirst();
+    }
+
+    @Override
     public List<Scoped<Identity>> listIdentities(ScopeFilter filter, UUID personId, String state, PageRequest page) {
         return identities.values().stream().map(i -> findIdentity(i.id()).orElseThrow())
                 .filter(s -> filter.matches(s.orgUnitPath() == null ? ResourceScope.PLATFORM : ResourceScope.orgUnit(s.orgUnitPath())))

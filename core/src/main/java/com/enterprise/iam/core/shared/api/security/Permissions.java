@@ -4,7 +4,7 @@ import java.util.List;
 
 /**
  * Permission catalog (DOMAIN-MODEL §4). Codes are {@code resource:action}. The catalog is seeded into
- * {@code authorization.permission} by migration; {@code PermissionCatalogTest} keeps code and seed in sync.
+ * {@code authorization.permission} by migrations (V6, V11, …); {@code PermissionCatalogTest} keeps code and seeds in sync.
  */
 public final class Permissions {
 
@@ -28,13 +28,19 @@ public final class Permissions {
     public static final String TARGET_WRITE = "target:write";
     public static final String PROVIDER_READ = "provider:read";
     public static final String PROVIDER_WRITE = "provider:write";
+    public static final String ACCOUNT_READ = "account:read";
+    public static final String ACCOUNT_WRITE = "account:write";
+    public static final String ACCOUNT_DISCOVER = "account:discover";
+    public static final String ACCOUNT_FINDING_RESOLVE = "account:finding:resolve";
+    public static final String OPERATION_EXECUTE = "operation:execute";
 
     /** All permission codes, in catalog order. */
     public static final List<String> ALL = List.of(
             SYSTEM_READ, SYSTEM_HEALTH_READ, ORG_READ, ORG_WRITE, PERSON_READ, PERSON_WRITE,
             IDENTITY_READ, IDENTITY_WRITE, IDENTITY_LIFECYCLE, IDENTITY_PLATFORM_USER,
             ROLE_READ, ROLE_ASSIGNMENT_READ, ROLE_ASSIGNMENT_WRITE, AUDIT_READ, AUDIT_VERIFY,
-            OPERATION_READ, TARGET_READ, TARGET_WRITE, PROVIDER_READ, PROVIDER_WRITE);
+            OPERATION_READ, TARGET_READ, TARGET_WRITE, PROVIDER_READ, PROVIDER_WRITE,
+            ACCOUNT_READ, ACCOUNT_WRITE, ACCOUNT_DISCOVER, ACCOUNT_FINDING_RESOLVE, OPERATION_EXECUTE);
 
     private Permissions() {
     }

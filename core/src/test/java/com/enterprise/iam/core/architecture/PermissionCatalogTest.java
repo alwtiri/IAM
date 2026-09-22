@@ -14,25 +14,42 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
-/** The permission catalog in code and the V6 seed must be identical, and every built-in role exists (spec §19). */
+/** The permission catalog in code and the migration seeds (in version order) must be identical, and every built-in role exists (spec §19). */
 class PermissionCatalogTest {
 
+    private static Path migrationDir() {
+        Path p = Path.of("src/main/resources/db/migration");
+        return Files.isDirectory(p) ? p : Path.of("core").resolve(p);
+    }
+
     private static String migration() throws IOException {
-        Path p = Path.of("src/main/resources/db/migration/V6__authorization.sql");
-        if (!Files.exists(p)) {
-            p = Path.of("core").resolve(p);
+        return Files.readString(migrationDir().resolve("V6__authorization.sql"), StandardCharsets.UTF_8);
+    }
+
+    /** Migration files in version order (V6 before V11). */
+    private static List<Path> migrations() throws IOException {
+        try (var files = Files.list(migrationDir())) {
+            return files.filter(f -> f.getFileName().toString().matches("V\\d+__.*\\.sql"))
+                    .sorted(java.util.Comparator.comparingInt(f -> Integer.parseInt(f.getFileName().toString().substring(1).split("__")[0])))
+                    .toList();
         }
-        return Files.readString(p, StandardCharsets.UTF_8);
     }
 
     @Test
     void seededPermissionsEqualCodeCatalog() throws IOException {
-        String sql = migration();
-        String block = sql.substring(sql.indexOf("INSERT INTO \"authorization\".permission"), sql.indexOf("-- Built-in roles"));
-        Matcher m = Pattern.compile("\\('([a-z:\\-]+)',").matcher(block);
         List<String> seeded = new ArrayList<>();
-        while (m.find()) {
-            seeded.add(m.group(1));
+        Pattern code = Pattern.compile("\\('([a-z:\\-]+)',");
+        for (Path f : migrations()) {
+            String sql = Files.readString(f, StandardCharsets.UTF_8);
+            int start = sql.indexOf("INSERT INTO \"authorization\".permission");
+            if (start < 0) {
+                continue;
+            }
+            int end = sql.indexOf(";", start);
+            Matcher m = code.matcher(sql.substring(start, end));
+            while (m.find()) {
+                seeded.add(m.group(1));
+            }
         }
         assertEquals(Permissions.ALL, seeded);
     }

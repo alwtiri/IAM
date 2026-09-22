@@ -40,6 +40,8 @@ public interface IdentityStore {
 
     boolean usernameExists(String username);
 
+    Optional<UUID> identityIdByUsername(String username);
+
     List<Scoped<Identity>> listIdentities(ScopeFilter filter, UUID personId, String state, PageRequest page);
 
     List<Identity> findExpired(Instant now, int limit);
