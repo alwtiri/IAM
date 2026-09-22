@@ -189,6 +189,11 @@ public class ProviderRegistryService implements ProviderDirectory {
     }
 
     @Override
+    public List<ProviderBindingView> allBindings() {
+        return tx.readOnly(store::allBindings);
+    }
+
+    @Override
     public boolean isBound(UUID targetId, UUID providerInstanceId) {
         return store.isBound(targetId, providerInstanceId);
     }

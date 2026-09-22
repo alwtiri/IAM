@@ -30,5 +30,9 @@ public interface ProviderStore {
 
     List<ProviderBindingView> bindings(UUID targetId);
 
+    default List<ProviderBindingView> allBindings() {
+        return List.of();
+    }
+
     boolean isBound(UUID targetId, UUID providerInstanceId);
 }

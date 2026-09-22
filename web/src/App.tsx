@@ -12,6 +12,7 @@ import { AuditPage, HealthPage, PlannedPage, ProvidersPage, RolesPage, TargetsPa
 import { UsersPage } from './pages/Users';
 import { OrgUnitsPage } from './pages/OrgUnits';
 import { AccessRequestsPage, ApprovalsPage, PoliciesPage } from './pages/Requests';
+import { ReportsPage } from './pages/Reports';
 import { DashboardPage } from './pages/Dashboard';
 import { MeContext } from './MeContext';
 import { ErrorAlert } from './pages/common';
@@ -30,6 +31,7 @@ const PAGES: Record<string, () => React.JSX.Element> = {
   servers: ServersPage,
   directory: OrgUnitsPage,
   accessRequests: AccessRequestsPage,
+  reports: ReportsPage,
   approvals: ApprovalsPage,
   accessPolicies: PoliciesPage,
   policies: PoliciesPage,

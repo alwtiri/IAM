@@ -100,6 +100,17 @@ public class JdbcProviderStore implements ProviderStore {
     }
 
     @Override
+    public List<ProviderBindingView> allBindings() {
+        return jdbc.sql("""
+                SELECT b.target_id, b.provider_instance_id, b.channel, p.type, p.name
+                FROM provider.target_binding b JOIN provider.provider_instance p ON p.id = b.provider_instance_id
+                WHERE p.enabled ORDER BY b.target_id""")
+                .query((rs, n) -> new ProviderBindingView(uuid(rs, "target_id"), uuid(rs, "provider_instance_id"), rs.getString("type"),
+                        rs.getString("name"), rs.getString("channel")))
+                .list();
+    }
+
+    @Override
     public List<ProviderBindingView> bindings(UUID targetId) {
         return jdbc.sql("""
                 SELECT b.target_id, b.provider_instance_id, b.channel, p.type, p.name

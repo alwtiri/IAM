@@ -82,7 +82,7 @@ export const NAVIGATION: NavItem[] = [
       leaf('configurationChanges', '/audit/configuration', 7),
     ],
   },
-  leaf('reports', '/reports', 7),
+  leaf('reports', '/reports', 4),
   {
     id: 'administration', path: '/admin', phase: 2, children: [
       leaf('rolesPermissions', '/admin/roles', 2, 'role:read'),

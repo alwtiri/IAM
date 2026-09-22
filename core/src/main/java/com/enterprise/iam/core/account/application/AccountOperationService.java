@@ -124,6 +124,35 @@ public class AccountOperationService {
         });
     }
 
+    /**
+     * Scheduled discovery (Phase 8 increment): starts a read-only discovery for every enabled binding whose last run is older
+     * than {@code interval} and that has no run in progress. Runs as the SYSTEM identity; failures of one binding never stop others.
+     *
+     * @return number of discoveries started
+     */
+    public int scheduleDiscoveries(Duration interval) {
+        CurrentActor system = CurrentActor.system(com.enterprise.iam.core.shared.api.security.SystemIdentities.SYSTEM_IDENTITY_ID);
+        java.time.Instant cutoff = java.time.Instant.now().minus(interval);
+        int started = 0;
+        for (var b : providers.allBindings()) {
+            try {
+                var runs = tx.readOnly(() -> store.runs(b.targetId(), 50)).stream()
+                        .filter(r -> r.providerInstanceId().equals(b.providerInstanceId())).toList();
+                boolean running = runs.stream().anyMatch(r -> "RUNNING".equals(r.status()) && r.startedAt().isAfter(cutoff));
+                boolean recent = runs.stream().anyMatch(r -> r.startedAt().isAfter(cutoff));
+                var c = providers.connection(b.providerInstanceId());
+                if (running || recent || c.isEmpty() || !c.get().enabled() || c.get().credentialSecretRef() == null) {
+                    continue;
+                }
+                requestDiscovery(system, b.targetId(), b.providerInstanceId());
+                started++;
+            } catch (RuntimeException e) {
+                // next binding; the failure is visible as a missing or failed run
+            }
+        }
+        return started;
+    }
+
     public Submitted requestLifecycle(CurrentActor actor, UUID accountId, Action action, String reason) {
         return tx.inTransaction(() -> {
             AccountStore.Scoped s = store.find(accountId).orElseThrow(() -> IamException.notFound("Account"));
