@@ -17,6 +17,7 @@ import { DashboardPage } from './pages/Dashboard';
 import { MeContext } from './MeContext';
 import { ErrorAlert } from './pages/common';
 import { DatabasesPage, ServersPage } from './pages/Servers';
+import { CredentialRequestsPage, MyCheckoutsPage, VaultPage } from './pages/Vault';
 import { AllAccountsPage, LinuxAccountsPage, PrivilegedAccountsPage, ServiceAccountsPage, WindowsAccountsPage } from './pages/Accounts';
 
 const PAGES: Record<string, () => React.JSX.Element> = {
@@ -42,6 +43,10 @@ const PAGES: Record<string, () => React.JSX.Element> = {
   privilegedAccounts: PrivilegedAccountsPage,
   linuxAccounts: LinuxAccountsPage,
   windowsAccounts: WindowsAccountsPage,
+  passwordVault: VaultPage,
+  pamRequests: CredentialRequestsPage,
+  myCheckouts: MyCheckoutsPage,
+  pamApprovals: ApprovalsPage,
 };
 
 function routeElement(item: NavItem) {

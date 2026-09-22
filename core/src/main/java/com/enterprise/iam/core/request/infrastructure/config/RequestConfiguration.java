@@ -1,5 +1,7 @@
 package com.enterprise.iam.core.request.infrastructure.config;
 
+import com.enterprise.iam.core.account.api.CredentialCheckoutEnded;
+import com.enterprise.iam.core.account.api.CredentialCheckouts;
 import com.enterprise.iam.core.audit.api.AuditRecorder;
 import com.enterprise.iam.core.authorization.api.RoleAssignmentChanged;
 import com.enterprise.iam.core.authorization.api.RoleDirectory;
@@ -30,8 +32,8 @@ class RequestConfiguration {
     @Bean
     AccessRequestService accessRequestService(RequestStore store, RoleDirectory roles, IdentityDirectory identities, PolicyDecisionPoint pdp,
                                               SodChecker sod, AccessGuard guard, AuditRecorder audit, DomainEventPublisher events,
-                                              TransactionRunner tx, Clock clock) {
-        return new AccessRequestService(store, roles, identities, pdp, sod, guard, audit, events, tx, clock);
+                                              TransactionRunner tx, Clock clock, CredentialCheckouts checkouts) {
+        return new AccessRequestService(store, roles, identities, pdp, sod, guard, audit, events, tx, clock, checkouts);
     }
 
     @Bean
@@ -50,6 +52,13 @@ class RequestConfiguration {
         @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
         void on(RoleAssignmentChanged e) {
             requests.onAssignmentChanged(e.assignmentId(), e.change());
+        }
+
+        @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+        void on(CredentialCheckoutEnded e) {
+            if (e.requestId() != null) {
+                requests.onAssignmentChanged(e.checkoutId(), e.status());
+            }
         }
     }
 }

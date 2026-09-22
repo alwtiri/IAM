@@ -27,9 +27,10 @@ public class JdbcRequestStore implements RequestStore {
         jdbc.sql("""
                 INSERT INTO request.access_request (id, requester_id, beneficiary_id, type, role_id, role_code, scope_type, scope_value,
                     justification, duration_days, status, status_reason, decision, sod_conflicts, role_assignment_id, valid_until,
-                    created_at, updated_at, version)
+                    created_at, updated_at, version, account_id, duration_hours)
                 VALUES (:id, :requester, :beneficiary, :type, :role, :roleCode, :scopeType, :scopeValue, :justification, :days, :status,
-                    :reason, CAST(:decision AS jsonb), CAST(:sod AS jsonb), :assignment, :until, :created, :updated, 0)""")
+                    :reason, CAST(:decision AS jsonb), CAST(:sod AS jsonb), :assignment, :until, :created, :updated, 0, :account, :hours)""")
+                .param("account", r.accountId()).param("hours", r.durationHours())
                 .param("id", r.id()).param("requester", r.requesterId()).param("beneficiary", r.beneficiaryId()).param("type", r.type())
                 .param("role", r.roleId()).param("roleCode", r.roleCode()).param("scopeType", r.scopeType()).param("scopeValue", r.scopeValue())
                 .param("justification", r.justification()).param("days", r.durationDays()).param("status", r.status().name())
@@ -86,6 +87,12 @@ public class JdbcRequestStore implements RequestStore {
     }
 
     @Override
+    public boolean hasOpenCredentialRequest(UUID beneficiaryId, UUID accountId) {
+        return jdbc.sql("SELECT count(*) FROM request.access_request WHERE beneficiary_id = :b AND account_id = :a AND type = 'CREDENTIAL' AND status IN ('PENDING_APPROVAL','APPROVED')")
+                .param("b", beneficiaryId).param("a", accountId).query(Long.class).single() > 0;
+    }
+
+    @Override
     public List<AccessRequest> byRequester(UUID requesterId, int limit) {
         return jdbc.sql(SELECT + " WHERE requester_id = :r ORDER BY created_at DESC LIMIT :l").param("r", requesterId).param("l", limit)
                 .query(JdbcRequestStore::map).list();
@@ -124,7 +131,8 @@ public class JdbcRequestStore implements RequestStore {
                 rs.getString("scope_value"), rs.getString("justification"), rs.getInt("duration_days"),
                 AccessRequest.Status.valueOf(rs.getString("status")), rs.getString("status_reason"), rs.getString("decision"),
                 rs.getString("sod_conflicts"), rs.getObject("role_assignment_id", UUID.class), instant(rs.getTimestamp("valid_until")),
-                instant(rs.getTimestamp("created_at")), instant(rs.getTimestamp("updated_at")), rs.getLong("version"));
+                instant(rs.getTimestamp("created_at")), instant(rs.getTimestamp("updated_at")), rs.getLong("version"),
+                rs.getObject("account_id", UUID.class), (Integer) rs.getObject("duration_hours"));
     }
 
     private static Timestamp ts(Instant i) {

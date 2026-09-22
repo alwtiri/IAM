@@ -1,5 +1,6 @@
 package com.enterprise.iam.core.request.application;
 
+import com.enterprise.iam.core.account.api.CredentialCheckouts;
 import com.enterprise.iam.core.audit.api.AuditEntry;
 import com.enterprise.iam.core.audit.api.AuditRecorder;
 import com.enterprise.iam.core.authorization.api.RoleDirectory;
@@ -49,6 +50,9 @@ public class AccessRequestService {
     public record Submit(UUID roleId, String scopeType, String justification, int durationDays) {
     }
 
+    public record SubmitCredential(UUID accountId, String justification, int durationHours) {
+    }
+
     static final String FALLBACK_MANAGER_ROLE = "IAM_ADMINISTRATOR";
     static final String FALLBACK_ROLE = "PLATFORM_ADMINISTRATOR";
     private static final int LIST_LIMIT = 200;
@@ -63,9 +67,12 @@ public class AccessRequestService {
     private final DomainEventPublisher events;
     private final TransactionRunner tx;
     private final Clock clock;
+    private final CredentialCheckouts checkouts;
 
     public AccessRequestService(RequestStore store, RoleDirectory roles, IdentityDirectory identities, PolicyDecisionPoint pdp, SodChecker sod,
-                                AccessGuard guard, AuditRecorder audit, DomainEventPublisher events, TransactionRunner tx, Clock clock) {
+                                AccessGuard guard, AuditRecorder audit, DomainEventPublisher events, TransactionRunner tx, Clock clock,
+                                CredentialCheckouts checkouts) {
+        this.checkouts = checkouts;
         this.store = store;
         this.roles = roles;
         this.identities = identities;
@@ -134,7 +141,7 @@ public class AccessRequestService {
         }
         AccessRequest req = new AccessRequest(id, actor.identityId(), beneficiary.id(), "ROLE", role.id(), role.code(), scopeType, scopeValue,
                 blankToNull(cmd.justification()), cmd.durationDays(), status, reason, decisionJson(decision), conflictsJson(conflicts), null, null,
-                now, now, 0);
+                now, now, 0, null, null);
         List<ApprovalStep> finalSteps = steps;
         tx.run(() -> {
             if (status != AccessRequest.Status.REJECTED && store.hasOpenRequest(beneficiary.id(), role.id())) {
@@ -143,6 +150,75 @@ public class AccessRequestService {
             store.insert(req, finalSteps);
             audit.record(actor, AuditEntry.success("access-request.submitted", "access-request", id, Map.of("role", role.code(),
                     "status", status.name(), "policies", String.join(",", decision.matchedPolicies()), "scope", scopeType)));
+            if (status == AccessRequest.Status.PENDING_APPROVAL) {
+                publishPending(req, finalSteps.get(0));
+            }
+        });
+        if (status == AccessRequest.Status.APPROVED) {
+            fulfil(id);
+        }
+        return get(actor, id);
+    }
+
+    /** Vaulted privileged accounts the caller can request a checkout of, with the policy outcome. */
+    public List<Map<String, Object>> requestableCredentials(CurrentActor actor) {
+        IdentitySummary me = activeIdentity(actor.identityId());
+        PolicyDecision d = pdp.evaluate(new RequestContext("CREDENTIAL", null, me.type(), 1));
+        return checkouts.checkoutTargets().stream().map(t -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("accountId", t.accountId());
+            m.put("accountName", t.accountName());
+            m.put("targetId", t.targetId());
+            m.put("targetName", t.targetName());
+            m.put("providerType", t.providerType());
+            m.put("available", t.available());
+            m.put("unavailableReason", t.unavailableReason());
+            m.put("allowed", d.allowed());
+            m.put("approvals", d.approvals());
+            m.put("requireJustification", d.requireJustification());
+            m.put("maxDurationDays", d.maxDurationDays());
+            m.put("explanation", d.explanation());
+            return m;
+        }).toList();
+    }
+
+    /** Requests a time-bound checkout of a vaulted privileged password (ADR-0021). */
+    public AccessRequestView submitCredential(CurrentActor actor, SubmitCredential cmd) {
+        IdentitySummary beneficiary = activeIdentity(actor.identityId());
+        CredentialCheckouts.CheckoutTarget target = checkouts.checkoutTarget(cmd.accountId())
+                .orElseThrow(() -> IamException.validation("accountId", "NOT_VAULTED", "the platform does not manage this account's password"));
+        if (cmd.durationHours() < 1 || cmd.durationHours() > 72) {
+            throw IamException.validation("durationHours", "OUT_OF_RANGE", "a checkout lasts between 1 and 72 hours");
+        }
+        int days = (cmd.durationHours() + 23) / 24;
+        PolicyDecision decision = pdp.evaluate(new RequestContext("CREDENTIAL", null, beneficiary.type(), days));
+        if (decision.allowed() && decision.requireJustification() && (cmd.justification() == null || cmd.justification().isBlank())) {
+            throw IamException.validation("justification", "REQUIRED", "a justification is required to check out a privileged password");
+        }
+        Instant now = clock.instant();
+        UUID id = Ids.newId(clock);
+        AccessRequest.Status status;
+        String reason = null;
+        List<ApprovalStep> steps = new ArrayList<>();
+        if (!decision.allowed()) {
+            status = AccessRequest.Status.REJECTED;
+            reason = "policy: " + decision.explanation();
+        } else {
+            steps = buildSteps(id, decision.approvals(), beneficiary.id(), actor.identityId());
+            status = steps.isEmpty() ? AccessRequest.Status.APPROVED : AccessRequest.Status.PENDING_APPROVAL;
+        }
+        AccessRequest req = new AccessRequest(id, actor.identityId(), beneficiary.id(), "CREDENTIAL", null, target.label(), "GLOBAL", "*",
+                blankToNull(cmd.justification()), days, status, reason, decisionJson(decision), "[]", null, null, now, now, 0, target.accountId(),
+                cmd.durationHours());
+        List<ApprovalStep> finalSteps = steps;
+        tx.run(() -> {
+            if (status != AccessRequest.Status.REJECTED && store.hasOpenCredentialRequest(beneficiary.id(), target.accountId())) {
+                throw IamException.alreadyExists("An open request for this account");
+            }
+            store.insert(req, finalSteps);
+            audit.record(actor, AuditEntry.success("access-request.submitted", "access-request", id, Map.of("type", "CREDENTIAL",
+                    "account", target.accountId().toString(), "status", status.name(), "policies", String.join(",", decision.matchedPolicies()),
+                    "hours", String.valueOf(cmd.durationHours()))));
             if (status == AccessRequest.Status.PENDING_APPROVAL) {
                 publishPending(req, finalSteps.get(0));
             }
@@ -213,8 +289,8 @@ public class AccessRequestService {
             }
             // All approvals collected: re-evaluate policy and SoD before granting (decisions may have changed meanwhile).
             IdentitySummary beneficiary = identities.find(req.beneficiaryId()).orElseThrow(() -> IamException.notFound("Identity"));
-            PolicyDecision d = pdp.evaluate(new RequestContext("ROLE", req.roleCode(), beneficiary.type(), req.durationDays()));
-            List<SodConflict> conflicts = sod.check(roles.activeRoleCodes(req.beneficiaryId()), req.roleCode());
+            PolicyDecision d = pdp.evaluate(context(req, beneficiary.type()));
+            List<SodConflict> conflicts = req.credential() ? List.of() : sod.check(roles.activeRoleCodes(req.beneficiaryId()), req.roleCode());
             if (!d.allowed() || conflicts.stream().anyMatch(SodConflict::blocking) || !"ACTIVE".equals(beneficiary.state())) {
                 save(req.withStatus(AccessRequest.Status.REJECTED, "re-evaluation before grant failed: "
                         + (!d.allowed() ? d.explanation() : !"ACTIVE".equals(beneficiary.state()) ? "beneficiary is " + beneficiary.state()
@@ -268,11 +344,14 @@ public class AccessRequestService {
         if (req.status() != AccessRequest.Status.APPROVED) {
             return;
         }
-        PolicyDecision d = pdp.evaluate(new RequestContext("ROLE", req.roleCode(),
-                identities.find(req.beneficiaryId()).map(IdentitySummary::type).orElse("UNKNOWN"), req.durationDays()));
+        CurrentActor system = CurrentActor.system(SystemIdentities.SYSTEM_IDENTITY_ID);
+        if (req.credential()) {
+            fulfilCredential(req, system);
+            return;
+        }
+        PolicyDecision d = pdp.evaluate(context(req, identities.find(req.beneficiaryId()).map(IdentitySummary::type).orElse("UNKNOWN")));
         int days = d.maxDurationDays() == null ? req.durationDays() : Math.min(req.durationDays(), d.maxDurationDays());
         Instant until = clock.instant().plus(Duration.ofDays(days));
-        CurrentActor system = CurrentActor.system(SystemIdentities.SYSTEM_IDENTITY_ID);
         try {
             UUID assignment = roles.grantForRequest(req.beneficiaryId(), req.roleId(), req.scopeType(), req.scopeValue(), until, req.id(),
                     "access request " + req.id());
@@ -293,13 +372,47 @@ public class AccessRequestService {
         }
     }
 
-    /** Keeps the request in line with its role assignment (expired by the scheduler or revoked by an administrator). */
+    private void fulfilCredential(AccessRequest req, CurrentActor system) {
+        Duration duration = Duration.ofHours(req.durationHours() == null ? 1 : req.durationHours());
+        Instant until = clock.instant().plus(duration);
+        try {
+            UUID checkout = checkouts.grant(req.accountId(), req.beneficiaryId(), req.id(), duration,
+                    req.justification() == null ? "access request " + req.id() : req.justification());
+            tx.run(() -> {
+                AccessRequest cur = store.find(req.id()).orElseThrow();
+                save(cur.fulfilled(checkout, until, clock.instant()), cur);
+                publishOutcome(cur, "ACTIVE", "checked out until " + until);
+                audit.record(system, AuditEntry.success("access-request.fulfilled", "access-request", req.id(),
+                        Map.of("type", "CREDENTIAL", "checkout", checkout.toString(), "validUntil", until.toString())));
+            });
+        } catch (IamException e) {
+            tx.run(() -> {
+                AccessRequest cur = store.find(req.id()).orElseThrow();
+                save(cur.withStatus(AccessRequest.Status.FAILED, "checkout failed: " + e.getMessage(), clock.instant()), cur);
+                publishOutcome(cur, "FAILED", "checkout failed: " + e.getMessage());
+            });
+        }
+    }
+
+    private static RequestContext context(AccessRequest req, String identityType) {
+        return req.credential() ? new RequestContext("CREDENTIAL", null, identityType, req.durationDays())
+                : new RequestContext("ROLE", req.roleCode(), identityType, req.durationDays());
+    }
+
+    /**
+     * Keeps the request in line with its fulfilment: a role assignment expired or revoked, or a credential checkout checked
+     * in, expired or revoked.
+     */
     public void onAssignmentChanged(UUID assignmentId, String change) {
+        if ("CHECKED_IN".equals(change)) {
+            change = "EXPIRED";
+        }
         if (!"EXPIRED".equals(change) && !"REVOKED".equals(change)) {
             return;
         }
+        String outcome = change;
         tx.run(() -> store.byAssignment(assignmentId).filter(r -> r.status() == AccessRequest.Status.ACTIVE).ifPresent(r ->
-                save(r.withStatus("EXPIRED".equals(change) ? AccessRequest.Status.EXPIRED : AccessRequest.Status.REVOKED, null, clock.instant()), r)));
+                save(r.withStatus("EXPIRED".equals(outcome) ? AccessRequest.Status.EXPIRED : AccessRequest.Status.REVOKED, null, clock.instant()), r)));
     }
 
     // ------------------------------------------------------------------ queries
@@ -385,7 +498,8 @@ public class AccessRequestService {
         return new AccessRequestView(r.id(), r.requesterId(), name(r.requesterId()), r.beneficiaryId(), name(r.beneficiaryId()), r.roleId(),
                 r.roleCode(), r.scopeType(), r.scopeValue(), r.justification(), r.durationDays(), r.status().name(), r.statusReason(),
                 str(decision.get("explanation")), matched, conflicts, stepViews, r.roleAssignmentId(), r.validUntil(), r.createdAt(), r.updatedAt(),
-                canDecide, me.equals(r.requesterId()) && r.status() == AccessRequest.Status.PENDING_APPROVAL);
+                canDecide, me.equals(r.requesterId()) && r.status() == AccessRequest.Status.PENDING_APPROVAL, r.type(), r.accountId(),
+                r.durationHours());
     }
 
     private String name(UUID id) {

@@ -49,9 +49,11 @@ export const NAVIGATION: NavItem[] = [
     ],
   },
   {
-    id: 'privilegedAccess', path: '/pam', phase: 6, children: [
-      leaf('pamRequests', '/pam/requests', 6),
-      leaf('pamApprovals', '/pam/approvals', 6),
+    id: 'privilegedAccess', path: '/pam', phase: 4, children: [
+      leaf('passwordVault', '/pam/vault', 4, 'account:read'),
+      leaf('pamRequests', '/pam/requests', 4),
+      leaf('myCheckouts', '/pam/checkouts', 4),
+      leaf('pamApprovals', '/pam/approvals', 4),
       leaf('privilegedSessions', '/pam/sessions', 6),
       leaf('sshAccess', '/pam/ssh', 6),
       leaf('rdpAccess', '/pam/rdp', 6),

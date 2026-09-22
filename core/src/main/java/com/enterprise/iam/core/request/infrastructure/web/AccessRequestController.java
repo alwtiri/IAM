@@ -35,6 +35,9 @@ class AccessRequestController {
                          @Min(1) @Max(3650) int durationDays) {
     }
 
+    record SubmitCredentialRequest(@NotNull UUID accountId, @Size(max = 1000) String justification, @Min(1) @Max(72) int durationHours) {
+    }
+
     record DecisionRequest(@Size(max = 1000) String comment) {
     }
 
@@ -57,6 +60,20 @@ class AccessRequestController {
     @AuthenticatedEndpoint
     AccessRequestView submit(@Valid @RequestBody SubmitRequest r) {
         return requests.submit(actors.require(), new AccessRequestService.Submit(r.roleId(), r.scopeType(), r.justification(), r.durationDays()));
+    }
+
+    @GetMapping("/access-requests/requestable-credentials")
+    @AuthenticatedEndpoint
+    List<java.util.Map<String, Object>> requestableCredentials() {
+        return requests.requestableCredentials(actors.require());
+    }
+
+    @PostMapping("/access-requests/credential")
+    @ResponseStatus(HttpStatus.CREATED)
+    @AuthenticatedEndpoint
+    AccessRequestView submitCredential(@Valid @RequestBody SubmitCredentialRequest r) {
+        return requests.submitCredential(actors.require(),
+                new AccessRequestService.SubmitCredential(r.accountId(), r.justification(), r.durationHours()));
     }
 
     @GetMapping("/access-requests")

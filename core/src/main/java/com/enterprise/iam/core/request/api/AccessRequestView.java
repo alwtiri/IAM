@@ -8,7 +8,7 @@ public record AccessRequestView(UUID id, UUID requesterId, String requesterName,
                                 String roleCode, String scopeType, String scopeValue, String justification, int durationDays, String status,
                                 String statusReason, String policyExplanation, List<String> matchedPolicies, List<Conflict> sodConflicts,
                                 List<Step> steps, UUID roleAssignmentId, Instant validUntil, Instant createdAt, Instant updatedAt,
-                                boolean canDecide, boolean canCancel) {
+                                boolean canDecide, boolean canCancel, String type, UUID accountId, Integer durationHours) {
 
     public record Step(int stepNo, String approverType, String approverRole, UUID approverIdentityId, String approverName, String status,
                        UUID decidedBy, String decidedByName, Instant decidedAt, String comment, String note) {

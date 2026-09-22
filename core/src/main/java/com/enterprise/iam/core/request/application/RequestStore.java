@@ -20,6 +20,8 @@ public interface RequestStore {
 
     boolean hasOpenRequest(UUID beneficiaryId, UUID roleId);
 
+    boolean hasOpenCredentialRequest(UUID beneficiaryId, UUID accountId);
+
     List<AccessRequest> byRequester(UUID requesterId, int limit);
 
     List<AccessRequest> all(String status, int limit);

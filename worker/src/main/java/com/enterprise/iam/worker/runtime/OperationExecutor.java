@@ -193,7 +193,7 @@ public final class OperationExecutor {
                 case DISABLE_ACCOUNT -> single(provider.disableAccount(ctx, account(c)), s -> Map.of("state", AccountJson.state(s)));
                 case UNLOCK_ACCOUNT -> single(provider.unlockAccount(ctx, account(c)), s -> Map.of("state", AccountJson.state(s)));
                 case ROTATE_PASSWORD -> {
-                    String newSecret = c.credentialHandles().get("newSecret");
+                    String newSecret = c.credentialHandles().get("new-secret");
                     if (newSecret == null) {
                         yield Outcome.of(error("CONFIGURATION_INVALID", "rotation command without a new secret handle", false, false));
                     }

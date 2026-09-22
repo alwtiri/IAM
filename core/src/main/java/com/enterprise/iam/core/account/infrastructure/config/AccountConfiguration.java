@@ -3,6 +3,12 @@ package com.enterprise.iam.core.account.infrastructure.config;
 import com.enterprise.iam.core.account.application.AccountOperationService;
 import com.enterprise.iam.core.account.application.AccountService;
 import com.enterprise.iam.core.account.application.AccountStore;
+import com.enterprise.iam.core.account.application.CredentialVaultService;
+import com.enterprise.iam.core.account.application.CredentialVaultStore;
+import com.enterprise.iam.core.account.domain.PasswordGenerator;
+import com.enterprise.iam.core.account.infrastructure.persistence.JdbcCredentialVaultStore;
+import com.enterprise.iam.core.secrets.api.SecretStore;
+import com.enterprise.iam.core.shared.api.events.DomainEventPublisher;
 import com.enterprise.iam.core.account.infrastructure.persistence.JdbcAccountStore;
 import com.enterprise.iam.core.audit.api.AuditRecorder;
 import com.enterprise.iam.core.identity.api.IdentityDirectory;
@@ -77,16 +83,63 @@ class AccountConfiguration {
     }
 
     @Bean
-    OperationResultListeners accountOperationResultListeners(AccountOperationService service) {
-        return new OperationResultListeners(service);
+    CredentialVaultStore credentialVaultStore(JdbcClient jdbc) {
+        return new JdbcCredentialVaultStore(jdbc);
+    }
+
+    @Bean
+    CredentialVaultService credentialVaultService(AccountStore accounts, CredentialVaultStore store, SecretStore secrets, CredentialHandles handles,
+                                                  OperationCommands operations, ProviderDirectory providers, IdentityDirectory identities,
+                                                  AccessGuard guard, AuditRecorder audit, DomainEventPublisher events, TransactionRunner tx,
+                                                  Clock clock, @Value("${iam.vault.rotation-interval:P30D}") Duration interval) {
+        return new CredentialVaultService(accounts, store, secrets, handles, operations, providers, identities, guard, audit, events, tx, clock,
+                new PasswordGenerator(new java.security.SecureRandom()), interval);
+    }
+
+    @Bean
+    VaultJobs vaultJobs(CredentialVaultService vault) {
+        return new VaultJobs(vault);
+    }
+
+    /** Ends overdue checkouts (rotating revealed passwords) every minute; rotates credentials past their interval hourly. */
+    static class VaultJobs {
+        private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(VaultJobs.class);
+        private final CredentialVaultService vault;
+
+        VaultJobs(CredentialVaultService vault) {
+            this.vault = vault;
+        }
+
+        @Scheduled(fixedDelayString = "${iam.vault.checkout-check-every:PT1M}", initialDelayString = "PT1M")
+        void expire() {
+            int n = vault.expireCheckouts();
+            if (n > 0) {
+                LOG.info("Ended {} overdue credential checkout(s)", n);
+            }
+        }
+
+        @Scheduled(fixedDelayString = "${iam.vault.rotation-check-every:PT1H}", initialDelayString = "PT5M")
+        void rotate() {
+            int n = vault.rotateDue();
+            if (n > 0) {
+                LOG.info("Started {} scheduled password rotation(s)", n);
+            }
+        }
+    }
+
+    @Bean
+    OperationResultListeners accountOperationResultListeners(AccountOperationService service, CredentialVaultService vault) {
+        return new OperationResultListeners(service, vault);
     }
 
     /** Synchronous listeners: imports commit or roll back together with the operation result. */
     static class OperationResultListeners {
         private final AccountOperationService service;
+        private final CredentialVaultService vault;
 
-        OperationResultListeners(AccountOperationService service) {
+        OperationResultListeners(AccountOperationService service, CredentialVaultService vault) {
             this.service = service;
+            this.vault = vault;
         }
 
         @EventListener
@@ -97,6 +150,7 @@ class AccountConfiguration {
         @EventListener
         void onCompleted(OperationCompleted e) {
             service.onCompleted(e);
+            vault.onCompleted(e);
         }
     }
 }

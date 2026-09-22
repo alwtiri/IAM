@@ -64,7 +64,7 @@ class AccessRequestServiceTest {
             }
             requests.put(r.id(), new AccessRequest(r.id(), r.requesterId(), r.beneficiaryId(), r.type(), r.roleId(), r.roleCode(), r.scopeType(),
                     r.scopeValue(), r.justification(), r.durationDays(), r.status(), r.statusReason(), r.decisionJson(), r.sodConflictsJson(),
-                    r.roleAssignmentId(), r.validUntil(), r.createdAt(), r.updatedAt(), expectedVersion + 1));
+                    r.roleAssignmentId(), r.validUntil(), r.createdAt(), r.updatedAt(), expectedVersion + 1, r.accountId(), r.durationHours()));
             return true;
         }
 
@@ -76,7 +76,12 @@ class AccessRequestServiceTest {
 
         @Override
         public boolean hasOpenRequest(UUID beneficiaryId, UUID roleId) {
-            return requests.values().stream().anyMatch(r -> r.beneficiaryId().equals(beneficiaryId) && r.roleId().equals(roleId) && r.open());
+            return requests.values().stream().anyMatch(r -> r.beneficiaryId().equals(beneficiaryId) && roleId.equals(r.roleId()) && r.open());
+        }
+
+        @Override
+        public boolean hasOpenCredentialRequest(UUID beneficiaryId, UUID accountId) {
+            return requests.values().stream().anyMatch(r -> r.beneficiaryId().equals(beneficiaryId) && accountId.equals(r.accountId()) && r.open());
         }
 
         @Override
@@ -170,6 +175,8 @@ class AccessRequestServiceTest {
             new Policy(UUID.randomUUID(), "P-200", "Privileged", null, true, "ALLOW", "ROLE",
                     List.of("PLATFORM_ADMINISTRATOR", "SECURITY_ADMINISTRATOR", "IAM_ADMINISTRATOR"), null,
                     List.of("MANAGER", "ROLE:SECURITY_ADMINISTRATOR"), true, 30, 0),
+            new Policy(UUID.randomUUID(), "P-300", "Checkout", null, true, "ALLOW", "CREDENTIAL", null, null,
+                    List.of("ROLE:SECURITY_ADMINISTRATOR"), true, 1, 0),
             new Policy(UUID.randomUUID(), "P-900", "No external admins", null, true, "DENY", "ROLE",
                     List.of("PLATFORM_ADMINISTRATOR"), List.of("CONTRACTOR"), List.of(), false, null, 0));
     final List<SodRule> rules = List.of(new SodRule(UUID.randomUUID(), "SOD-01", "Auditors cannot administer", "AUDITOR",
@@ -185,9 +192,32 @@ class AccessRequestServiceTest {
             return Optional.ofNullable(managers.get(identityId));
         }
     };
+    final UUID rootAccount = UUID.randomUUID();
+    final List<String> granted = new ArrayList<>();
+    final com.enterprise.iam.core.account.api.CredentialCheckouts checkouts = new com.enterprise.iam.core.account.api.CredentialCheckouts() {
+        @Override
+        public List<CheckoutTarget> checkoutTargets() {
+            return List.of(target());
+        }
+
+        @Override
+        public Optional<CheckoutTarget> checkoutTarget(UUID accountId) {
+            return accountId.equals(rootAccount) ? Optional.of(target()) : Optional.empty();
+        }
+
+        private CheckoutTarget target() {
+            return new CheckoutTarget(rootAccount, "root", UUID.randomUUID(), "srv01", "linux-ssh", true, null);
+        }
+
+        @Override
+        public UUID grant(UUID accountId, UUID identityId, UUID requestId, java.time.Duration duration, String reason) {
+            granted.add(identityId + "/" + duration.toHours());
+            return UUID.randomUUID();
+        }
+    };
     final AccessRequestService service = new AccessRequestService(store, roles, identities, ctx -> PolicyEvaluator.evaluate(policies, ctx),
             (held, requested) -> rules.stream().flatMap(r -> r.conflict(held, requested).stream()).toList(),
-            TestSupport.guard(true), (a, e) -> audit.add(e), published::add, TestSupport.DIRECT_TX, clock);
+            TestSupport.guard(true), (a, e) -> audit.add(e), published::add, TestSupport.DIRECT_TX, clock, checkouts);
 
     AccessRequestServiceTest() {
         for (UUID id : List.of(alice, manager, sec)) {
@@ -207,6 +237,25 @@ class AccessRequestServiceTest {
     }
 
     // ------------------------------------------------------------------ tests
+
+    @Test
+    void credentialCheckoutNeedsApprovalAndOpensATimeBoundCheckout() {
+        AccessRequestView r = service.submitCredential(as(alice), new AccessRequestService.SubmitCredential(rootAccount, "incident 42", 4));
+        assertEquals("PENDING_APPROVAL", r.status());
+        assertEquals("CREDENTIAL", r.type());
+        assertEquals("root @ srv01", r.roleCode());
+        assertThrows(IamException.class, () -> service.submitCredential(as(alice),
+                new AccessRequestService.SubmitCredential(rootAccount, "again", 4)), "one open request per account");
+        assertThrows(IamException.class, () -> service.submitCredential(as(alice),
+                new AccessRequestService.SubmitCredential(rootAccount, null, 4)).status(), "justification required");
+        AccessRequestView done = service.decide(as(sec), r.id(), true, null);
+        assertEquals("ACTIVE", done.status());
+        assertEquals(List.of(alice + "/4"), granted);
+        service.onAssignmentChanged(done.roleAssignmentId(), "CHECKED_IN");
+        assertEquals("EXPIRED", service.get(as(alice), r.id()).status());
+        assertEquals("REJECTED", service.submitCredential(as(alice), new AccessRequestService.SubmitCredential(rootAccount, "x", 30)).status(),
+                "longer than the one-day policy maximum");
+    }
 
     @Test
     void standardRoleNeedsTheManagerAndIsGrantedTimeBound() {

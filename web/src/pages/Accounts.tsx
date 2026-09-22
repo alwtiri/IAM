@@ -2,7 +2,10 @@ import { useState } from 'react';
 import {
   Alert, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Tooltip, Typography,
 } from '@mui/material';
+import { apiFetch } from '../api/client';
 import { submitAndWait } from '../api/operations';
+import { hasPermission } from '../api/types';
+import { useMe } from '../MeContext';
 import type { Account, Operation } from '../api/types';
 import { useLocale } from '../i18n/LocaleContext';
 import { format } from '../i18n/messages';
@@ -45,6 +48,15 @@ export function AccountsTable({ query, title, showServer = true, filter }: {
   const [busy, setBusy] = useState<string>();
   const [result, setResult] = useState<Operation>();
   const [actionError, setActionError] = useState<unknown>();
+  const [vaultTarget, setVaultTarget] = useState<Account>();
+  const [vaultInfo, setVaultInfo] = useState<string>();
+  const canVault = hasPermission(useMe(), 'credential:manage');
+
+  const vault = (account: Account) => {
+    setActionError(undefined);
+    apiFetch(`/api/v1/accounts/${account.id}:vault`, { method: 'POST', body: JSON.stringify({ reason: 'taken under management' }) })
+      .then(() => setVaultInfo(t.vaultStarted), setActionError);
+  };
 
   const run = async (account: Account, action: Action | 'refresh', why?: string) => {
     setBusy(account.id);
@@ -69,6 +81,7 @@ export function AccountsTable({ query, title, showServer = true, filter }: {
   return (
     <Stack spacing={2}>
       {result && <OperationOutcome op={result} />}
+      {vaultInfo && <Alert severity="info" onClose={() => setVaultInfo(undefined)}>{vaultInfo}</Alert>}
       {actionError !== undefined && <ErrorAlert error={actionError} />}
       <DataTable<Account> title={title} rows={rows} rowKey={(a) => a.id} columns={[
         { header: t.name, cell: (a) => <Tooltip title={a.displayName ?? ''}><span>{a.name}</span></Tooltip> },
@@ -84,10 +97,27 @@ export function AccountsTable({ query, title, showServer = true, filter }: {
               {a.nativeStatus === 'DISABLED' && <Button size="small" onClick={() => setPending({ account: a, action: 'enable' })}>{t.enable}</Button>}
               {a.nativeStatus === 'LOCKED' && <Button size="small" onClick={() => setPending({ account: a, action: 'unlock' })}>{t.unlock}</Button>}
               <Button size="small" onClick={() => void run(a, 'refresh')}>{t.refresh}</Button>
+              {canVault && a.privileged && a.nativeStatus !== 'ABSENT' && (
+                <Button size="small" color="secondary" onClick={() => setVaultTarget(a)}>{t.vaultTakeOver}</Button>
+              )}
             </Stack>
           )),
         },
       ]} footer={loading ? <CircularProgress size={24} aria-label={t.loading} /> : cursor ? <Button onClick={() => void loadMore()}>{t.loadMore}</Button> : null} />
+      <Dialog open={!!vaultTarget} onClose={() => setVaultTarget(undefined)}>
+        <DialogTitle>{t.vaultTakeOverTitle}</DialogTitle>
+        <DialogContent>
+          {vaultTarget && <Typography>{format(t.vaultTakeOverBody, { account: vaultTarget.name, server: vaultTarget.targetName })}</Typography>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setVaultTarget(undefined)}>{t.cancel}</Button>
+          <Button variant="contained" onClick={() => {
+            const a = vaultTarget;
+            setVaultTarget(undefined);
+            if (a) vault(a);
+          }}>{t.vaultTakeOver}</Button>
+        </DialogActions>
+      </Dialog>
       <Dialog open={!!pending} onClose={() => setPending(undefined)}>
         <DialogTitle>{t.confirmTitle}</DialogTitle>
         <DialogContent>

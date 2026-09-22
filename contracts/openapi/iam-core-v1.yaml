@@ -48,6 +48,8 @@ tags:
   description: Account Management Core (spec §12–§14, G8)
 - name: requests
   description: Access requests, approvals, policies and SoD (spec §20–§24)
+- name: vault
+  description: Privileged credential vault, rotation and checkout (Phase 6, ADR-0021)
 paths:
   /api/v1/system/info:
     get:
@@ -870,10 +872,14 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [subject, invitationSent]
+                required:
+                - subject
+                - invitationSent
                 properties:
-                  subject: { type: string }
-                  invitationSent: { type: boolean }
+                  subject:
+                    type: string
+                  invitationSent:
+                    type: boolean
   /api/v1/identities/{id}:resend-invitation:
     post:
       tags:
@@ -1766,7 +1772,7 @@ paths:
       - name: targetId
         in: query
         required: false
-        schema: &id014
+        schema: &id015
           type: string
           format: uuid
       - name: governanceState
@@ -2122,7 +2128,7 @@ paths:
       - name: providerInstanceId
         in: path
         required: true
-        schema: &id017
+        schema: &id018
           type: string
           format: uuid
       responses:
@@ -2269,6 +2275,299 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OperationSubmitted'
+  /api/v1/vaulted-credentials:
+    get:
+      tags:
+      - vault
+      operationId: listVaultedCredentials
+      summary: Privileged accounts whose password the platform holds
+      x-iam-phase: 6
+      x-iam-permission: account:read
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/vaulted-credentials/{id}:
+    get:
+      tags:
+      - vault
+      operationId: getVaultedCredential
+      summary: Vault state of one account (never the password)
+      x-iam-phase: 6
+      x-iam-permission: account:read
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/accounts/{id}:vault:
+    post:
+      tags:
+      - vault
+      operationId: vaultAccount
+      summary: Take the password under management (rotates it immediately; step-up)
+      x-iam-phase: 6
+      x-iam-permission: credential:manage
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: &id011
+              type: object
+              properties:
+                reason:
+                  type: string
+                  maxLength: 500
+  /api/v1/vaulted-credentials/{id}:rotate:
+    post:
+      tags:
+      - vault
+      operationId: rotateCredential
+      summary: Rotate the password now (verified; step-up)
+      x-iam-phase: 6
+      x-iam-permission: credential:manage
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: *id011
+  /api/v1/vaulted-credentials/{id}:checkout:
+    post:
+      tags:
+      - vault
+      operationId: checkoutCredentialDirect
+      summary: Check out directly as a credential manager (step-up, audited)
+      x-iam-phase: 6
+      x-iam-permission: credential:manage
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - reason
+              - durationHours
+              properties:
+                reason:
+                  type: string
+                  maxLength: 500
+                durationHours:
+                  type: integer
+                  minimum: 1
+                  maximum: 72
+  /api/v1/credential-checkouts:
+    get:
+      tags:
+      - vault
+      operationId: listCheckouts
+      summary: Own checkouts, or all with mine=false (credential:manage)
+      x-iam-phase: 6
+      x-iam-permission: authenticated
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - name: mine
+        in: query
+        schema:
+          type: boolean
+          default: true
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/credential-checkouts/{id}:reveal:
+    post:
+      tags:
+      - vault
+      operationId: revealCredential
+      summary: Reveal the password to the checkout holder (step-up; Cache-Control no-store; audited)
+      x-iam-phase: 6
+      x-iam-permission: authenticated
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/credential-checkouts/{id}:check-in:
+    post:
+      tags:
+      - vault
+      operationId: checkInCredential
+      summary: End the checkout (holder) or revoke it (credential manager); rotates when revealed
+      x-iam-phase: 6
+      x-iam-permission: authenticated
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/access-requests/requestable-credentials:
+    get:
+      tags:
+      - requests
+      operationId: listRequestableCredentials
+      summary: Vaulted accounts that can be requested, with the policy outcome
+      x-iam-phase: 6
+      x-iam-permission: authenticated
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/access-requests/credential:
+    post:
+      tags:
+      - requests
+      operationId: submitCredentialRequest
+      summary: Request a time-bound credential checkout
+      x-iam-phase: 6
+      x-iam-permission: authenticated
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - accountId
+              - durationHours
+              properties:
+                accountId:
+                  type: string
+                  format: uuid
+                justification:
+                  type: string
+                  maxLength: 1000
+                durationHours:
+                  type: integer
+                  minimum: 1
+                  maximum: 72
 components:
   securitySchemes:
     bffSession:
@@ -2679,7 +2978,7 @@ components:
       - version
       properties:
         id: *id003
-        parentId: &id011
+        parentId: &id012
           type:
           - string
           - 'null'
@@ -2718,7 +3017,7 @@ components:
       - code
       - name
       properties:
-        parentId: *id011
+        parentId: *id012
         kind:
           $ref: '#/components/schemas/OrgUnitKind'
         code:
@@ -2781,7 +3080,7 @@ components:
       - givenName
       - familyName
       properties:
-        orgUnitId: *id011
+        orgUnitId: *id012
         employeeId:
           type:
           - string
@@ -2798,9 +3097,9 @@ components:
           - string
           - 'null'
           maxLength: 200
-        positionId: *id011
-        locationId: *id011
-        managerPersonId: *id011
+        positionId: *id012
+        locationId: *id012
+        managerPersonId: *id012
         employmentStatus:
           $ref: '#/components/schemas/EmploymentStatus'
         startDate:
@@ -2834,7 +3133,7 @@ components:
       - version
       properties:
         id: *id003
-        orgUnitId: *id011
+        orgUnitId: *id012
         employeeId:
           type:
           - string
@@ -2845,9 +3144,9 @@ components:
           type: string
         displayName:
           type: string
-        positionId: *id011
-        locationId: *id011
-        managerPersonId: *id011
+        positionId: *id012
+        locationId: *id012
+        managerPersonId: *id012
         employmentStatus:
           $ref: '#/components/schemas/EmploymentStatus'
         startDate:
@@ -2919,7 +3218,7 @@ components:
         username:
           type: string
           pattern: ^[a-z0-9][a-z0-9._-]{2,63}$
-        validUntil: &id012
+        validUntil: &id013
           type:
           - string
           - 'null'
@@ -2951,7 +3250,7 @@ components:
           - string
           - 'null'
         validFrom: *id004
-        validUntil: *id012
+        validUntil: *id013
         platformUser:
           type: boolean
         version:
@@ -3057,8 +3356,8 @@ components:
           maxItems: 50
           items:
             $ref: '#/components/schemas/ScopeElement'
-        validFrom: *id012
-        validUntil: *id012
+        validFrom: *id013
+        validUntil: *id013
         reason:
           type:
           - string
@@ -3100,11 +3399,11 @@ components:
           - REVOKED
           - EXPIRED
         validFrom: *id004
-        validUntil: *id012
-        grantedBy: *id011
+        validUntil: *id013
+        grantedBy: *id012
         grantedAt: *id004
-        revokedBy: *id011
-        revokedAt: *id012
+        revokedBy: *id012
+        revokedAt: *id013
         reason:
           type:
           - string
@@ -3142,7 +3441,7 @@ components:
           type:
           - string
           - 'null'
-        authenticatedAt: *id012
+        authenticatedAt: *id013
         grants:
           type: array
           items:
@@ -3162,7 +3461,7 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/ScopeElement'
-              validUntil: *id012
+              validUntil: *id013
     AuditEvent:
       type: object
       required:
@@ -3178,7 +3477,7 @@ components:
         seq:
           type: integer
         occurredAt: *id004
-        actorIdentityId: *id011
+        actorIdentityId: *id012
         actorType:
           type: string
           enum:
@@ -3196,7 +3495,7 @@ components:
           type:
           - string
           - 'null'
-        targetId: *id011
+        targetId: *id012
         source:
           type:
           - string
@@ -3219,7 +3518,7 @@ components:
           type:
           - string
           - 'null'
-        providerInstanceId: *id011
+        providerInstanceId: *id012
         details:
           type: object
           additionalProperties:
@@ -3346,10 +3645,10 @@ components:
           - CONFIDENTIAL
           - RESTRICTED
         ownerOrgUnitId: *id003
-        ownerIdentityId: *id011
-        technicalOwnerIdentityId: *id011
-        businessOwnerIdentityId: *id011
-        locationId: *id011
+        ownerIdentityId: *id012
+        technicalOwnerIdentityId: *id012
+        businessOwnerIdentityId: *id012
+        locationId: *id012
         tags:
           type: array
           maxItems: 50
@@ -3420,14 +3719,14 @@ components:
         ownerOrgUnitId:
           type: string
           format: uuid
-        ownerIdentityId: &id013
+        ownerIdentityId: &id014
           type:
           - string
           - 'null'
           format: uuid
-        technicalOwnerIdentityId: *id013
-        businessOwnerIdentityId: *id013
-        locationId: *id013
+        technicalOwnerIdentityId: *id014
+        businessOwnerIdentityId: *id014
+        locationId: *id014
         tags:
           type: array
           maxItems: 50
@@ -3533,7 +3832,7 @@ components:
           - CLOSED
           - OPEN
           - HALF_OPEN
-        lastHealthAt: *id012
+        lastHealthAt: *id013
         failureReason:
           type:
           - string
@@ -3616,11 +3915,11 @@ components:
       - openFindings
       - version
       properties:
-        id: *id014
-        targetId: *id014
+        id: *id015
+        targetId: *id015
         targetName:
           type: string
-        providerInstanceId: *id014
+        providerInstanceId: *id015
         providerType:
           type: string
         nativeId:
@@ -3639,12 +3938,12 @@ components:
           type:
           - string
           - 'null'
-        ownerIdentityId: &id015
+        ownerIdentityId: &id016
           type:
           - string
           - 'null'
           format: uuid
-        linkedIdentityId: *id015
+        linkedIdentityId: *id016
         governanceState:
           $ref: '#/components/schemas/AccountGovernanceState'
         nativeStatus:
@@ -3659,13 +3958,13 @@ components:
           type: object
           additionalProperties:
             type: string
-        lastSeenAt: &id016
+        lastSeenAt: &id017
           type:
           - string
           - 'null'
           format: date-time
-        lastLoginAt: *id016
-        passwordLastSetAt: *id016
+        lastLoginAt: *id017
+        passwordLastSetAt: *id017
         openFindings:
           type: array
           items:
@@ -3694,8 +3993,8 @@ components:
       properties:
         type:
           $ref: '#/components/schemas/AccountType'
-        ownerIdentityId: *id015
-        linkedIdentityId: *id015
+        ownerIdentityId: *id016
+        linkedIdentityId: *id016
         governanceState:
           description: MANAGED is set by credential onboarding and REMOVED by discovery; both are rejected here.
           allOf:
@@ -3715,11 +4014,11 @@ components:
       - severity
       - detectedAt
       properties:
-        id: *id014
-        accountId: *id014
+        id: *id015
+        accountId: *id015
         accountName:
           type: string
-        targetId: *id014
+        targetId: *id015
         targetName:
           type: string
         type:
@@ -3729,7 +4028,7 @@ components:
         detectedAt:
           type: string
           format: date-time
-        resolvedAt: *id016
+        resolvedAt: *id017
         resolution:
           type:
           - string
@@ -3772,10 +4071,10 @@ components:
       - status
       - startedAt
       properties:
-        id: *id014
-        providerInstanceId: *id014
-        targetId: *id014
-        operationId: *id015
+        id: *id015
+        providerInstanceId: *id015
+        targetId: *id015
+        operationId: *id016
         status:
           type: string
           enum:
@@ -3785,7 +4084,7 @@ components:
         startedAt:
           type: string
           format: date-time
-        finishedAt: *id016
+        finishedAt: *id017
         accountsSeen:
           type: integer
         accountsNew:
@@ -3806,8 +4105,8 @@ components:
       - providerType
       - channel
       properties:
-        targetId: *id017
-        providerInstanceId: *id017
+        targetId: *id018
+        providerInstanceId: *id018
         providerType:
           type: string
         providerName:
@@ -3819,7 +4118,7 @@ components:
       required:
       - providerInstanceId
       properties:
-        providerInstanceId: *id017
+        providerInstanceId: *id018
         channel:
           type:
           - string
@@ -3831,14 +4130,14 @@ components:
       required:
       - providerInstanceId
       properties:
-        providerInstanceId: *id017
+        providerInstanceId: *id018
     OperationSubmitted:
       type: object
       required:
       - operationId
       description: Poll GET /api/v1/operations/{operationId} for progress.
       properties:
-        operationId: *id017
+        operationId: *id018
         discoveryRunId:
           type:
           - string

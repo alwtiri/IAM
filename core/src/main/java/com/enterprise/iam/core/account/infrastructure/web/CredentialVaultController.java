@@ -1,0 +1,99 @@
+package com.enterprise.iam.core.account.infrastructure.web;
+
+import com.enterprise.iam.core.account.api.CheckoutView;
+import com.enterprise.iam.core.account.api.RevealedCredential;
+import com.enterprise.iam.core.account.api.VaultedCredentialView;
+import com.enterprise.iam.core.account.application.CredentialVaultService;
+import com.enterprise.iam.core.shared.api.security.AuthenticatedEndpoint;
+import com.enterprise.iam.core.shared.api.security.CurrentActorProvider;
+import com.enterprise.iam.core.shared.api.security.Permissions;
+import com.enterprise.iam.core.shared.api.security.RequiresPermission;
+import com.enterprise.iam.core.shared.api.security.RequiresStepUp;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/** Privileged credential vault and checkouts (ADR-0021). Revealing a password always needs step-up and is audited. */
+@RestController
+@RequestMapping("/api/v1")
+class CredentialVaultController {
+
+    record ReasonRequest(@Size(max = 500) String reason) {
+    }
+
+    record CheckoutRequest(@NotBlank @Size(max = 500) String reason, @Min(1) @Max(72) int durationHours) {
+    }
+
+    private final CredentialVaultService vault;
+    private final CurrentActorProvider actors;
+
+    CredentialVaultController(CredentialVaultService vault, CurrentActorProvider actors) {
+        this.vault = vault;
+        this.actors = actors;
+    }
+
+    @GetMapping("/vaulted-credentials")
+    @RequiresPermission(Permissions.ACCOUNT_READ)
+    List<VaultedCredentialView> list() {
+        return vault.list(actors.require());
+    }
+
+    @GetMapping("/vaulted-credentials/{accountId}")
+    @RequiresPermission(Permissions.ACCOUNT_READ)
+    VaultedCredentialView get(@PathVariable UUID accountId) {
+        return vault.get(actors.require(), accountId);
+    }
+
+    @PostMapping("/accounts/{accountId}:vault")
+    @RequiresPermission(Permissions.CREDENTIAL_MANAGE)
+    @RequiresStepUp
+    VaultedCredentialView manage(@PathVariable UUID accountId, @Valid @RequestBody(required = false) ReasonRequest r) {
+        return vault.manage(actors.require(), accountId, r == null ? null : r.reason());
+    }
+
+    @PostMapping("/vaulted-credentials/{accountId}:rotate")
+    @RequiresPermission(Permissions.CREDENTIAL_MANAGE)
+    @RequiresStepUp
+    VaultedCredentialView rotate(@PathVariable UUID accountId, @Valid @RequestBody(required = false) ReasonRequest r) {
+        return vault.rotate(actors.require(), accountId, r == null ? null : r.reason());
+    }
+
+    @PostMapping("/vaulted-credentials/{accountId}:checkout")
+    @RequiresPermission(Permissions.CREDENTIAL_MANAGE)
+    @RequiresStepUp
+    CheckoutView checkoutDirect(@PathVariable UUID accountId, @Valid @RequestBody CheckoutRequest r) {
+        return vault.checkoutDirect(actors.require(), accountId, r.durationHours(), r.reason());
+    }
+
+    @GetMapping("/credential-checkouts")
+    @AuthenticatedEndpoint
+    List<CheckoutView> checkouts(@RequestParam(defaultValue = "true") boolean mine) {
+        return mine ? vault.myCheckouts(actors.require()) : vault.allCheckouts(actors.require());
+    }
+
+    @PostMapping("/credential-checkouts/{id}:reveal")
+    @AuthenticatedEndpoint
+    @RequiresStepUp
+    ResponseEntity<RevealedCredential> reveal(@PathVariable UUID id) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("Pragma", "no-cache").body(vault.reveal(actors.require(), id));
+    }
+
+    @PostMapping("/credential-checkouts/{id}:check-in")
+    @AuthenticatedEndpoint
+    CheckoutView checkIn(@PathVariable UUID id) {
+        return vault.checkIn(actors.require(), id);
+    }
+}
