@@ -67,7 +67,7 @@ development, and Vault must then be initialised again.
 
 The normative policy is [process/GIT-WORKFLOW-POLICY.md](process/GIT-WORKFLOW-POLICY.md). In short:
 
-1. Work on a branch; build and test locally. Run `./ci/local-checks.sh` before committing: project Semgrep rules, contract/enum sync, compose policy, and shellcheck. The registry Semgrep packs, Gitleaks, and Trivy also run when installed.
+1. Work on a branch; build and test locally with `./ci/local-build.sh`: the same `./gradlew build` as CI, inside the pinned JDK image, with Testcontainers support. Run `./ci/local-checks.sh` before committing: project Semgrep rules, contract/enum sync, compose policy, and shellcheck. The registry Semgrep packs, Gitleaks, and Trivy also run when installed.
 2. Commit locally with meaningful messages. There is no push after every commit.
 3. At a checkpoint (phase gate, milestone, before a risky change) push once with `./scripts/git-push.sh "message" [branch]`. It shows branch and status, blocks secret files, commits, pushes, and prints the PR link. Direct pushes to `main` are refused unless `ALLOW_MAIN=1`.
 4. CI validates the PR; it is not the everyday feedback loop.
