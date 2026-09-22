@@ -44,6 +44,20 @@ public interface IdentityStore {
 
     List<Scoped<Identity>> listIdentities(ScopeFilter filter, UUID personId, String state, PageRequest page);
 
+    /** User list query: all criteria optional; {@code search} matches username or display name (case-insensitive). */
+    record IdentityQuery(UUID personId, String state, String type, UUID orgUnitId, String search) {
+    }
+
+    /** Default: filters the basic listing in memory (stores override with SQL). {@code orgUnitId} needs a store override. */
+    default List<Scoped<Identity>> listIdentities(ScopeFilter filter, IdentityQuery q, PageRequest page) {
+        String s = q.search() == null ? null : q.search().trim().toLowerCase(java.util.Locale.ROOT);
+        return listIdentities(filter, q.personId(), q.state(), page).stream()
+                .filter(x -> q.type() == null || x.value().type().name().equals(q.type()))
+                .filter(x -> s == null || s.isEmpty() || x.value().username().toLowerCase(java.util.Locale.ROOT).contains(s)
+                        || (x.displayName() != null && x.displayName().toLowerCase(java.util.Locale.ROOT).contains(s)))
+                .toList();
+    }
+
     List<Identity> findExpired(Instant now, int limit);
 
     Optional<IdentitySummary> summary(UUID identityId);

@@ -1,4 +1,7 @@
-# Gate report — Phases 6.2 to 12
+# Gate report — Phases 6.2 to 12 (development increment, not accepted)
+
+> Status per feature: see ../FEATURE-MATURITY.md. Everything below is at most FUNCTIONALLY COMPLETE; server verification
+> and the acceptance list are pending. Phases 10–12 deliver documents and scripts, not a verified HA or acceptance run.
 
 Date: 2026-09-22 · Branch: `phase-3-core-providers`
 

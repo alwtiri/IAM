@@ -611,6 +611,23 @@ paths:
         required: false
         schema:
           $ref: '#/components/schemas/IdentityState'
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: orgUnitId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
       responses:
         '401':
           $ref: '#/components/responses/Error'
@@ -2835,6 +2852,73 @@ paths:
           $ref: '#/components/responses/Error'
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/users:
+    post:
+      tags:
+      - identities
+      operationId: createUser
+      summary: Create a user (person + identity, optionally activated) in one transaction
+      x-iam-phase: 2
+      x-iam-permission: identity:write
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - orgUnitId
+              - givenName
+              - familyName
+              - type
+              - username
+              properties:
+                orgUnitId:
+                  type: string
+                  format: uuid
+                employeeId:
+                  type: string
+                  maxLength: 32
+                givenName:
+                  type: string
+                  maxLength: 100
+                familyName:
+                  type: string
+                  maxLength: 100
+                displayName:
+                  type: string
+                  maxLength: 200
+                managerPersonId:
+                  type: string
+                  format: uuid
+                email:
+                  type: string
+                  maxLength: 320
+                phone:
+                  type: string
+                  maxLength: 40
+                type:
+                  type: string
+                username:
+                  type: string
+                  maxLength: 64
+                activate:
+                  type: boolean
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '201':
+          description: Created
           content:
             application/json:
               schema:

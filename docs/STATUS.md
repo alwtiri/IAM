@@ -1,5 +1,8 @@
 # Project status: what works, what is partial, what remains
 
+> The authoritative per-feature state is the maturity matrix in [FEATURE-MATURITY.md](FEATURE-MATURITY.md). Items below describe
+> capabilities; none is TESTED/ACCEPTED until verified on the server.
+
 Last updated: 2026-09-22 (Phases 6.2–12). "Works in the UI" means an administrator can do it end to end in the web app without
 curl. Everything below is also available through the REST API.
 

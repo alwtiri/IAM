@@ -50,6 +50,12 @@ class IdentityConfiguration {
     }
 
     @Bean
+    com.enterprise.iam.core.identity.application.UserAdministrationService userAdministrationService(PersonService persons,
+            IdentityService identities, IdentityStore store, TransactionRunner tx) {
+        return new com.enterprise.iam.core.identity.application.UserAdministrationService(persons, identities, store, tx);
+    }
+
+    @Bean
     LoginAccountProvisioner loginAccountProvisioner(@Value("${iam.auth.admin.base-url:http://keycloak:8080/auth}") String baseUrl,
                                                     @Value("${iam.auth.admin.realm:iam}") String realm,
                                                     @Value("${iam.auth.admin.client-id:iam-core-admin}") String clientId,
