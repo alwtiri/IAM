@@ -32,7 +32,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 public class JdbcAccountStore implements AccountStore {
 
     private static final ScopeSql.Columns SCOPE = new ScopeSql.Columns("ou.path", "t.environment", "p.type", "a.provider_instance_id", "a.target_id");
-    private static final String FROM = """
+    // Leading space: text blocks strip common indentation, so the clause must not be glued to the column list.
+    private static final String FROM = " " + """
              FROM account.account a
              JOIN target.target t ON t.id = a.target_id
              JOIN organization.org_unit ou ON ou.id = t.owner_org_unit_id
