@@ -58,7 +58,6 @@ class InternalApiConfiguration {
             Http11NioProtocol protocol = (Http11NioProtocol) connector.getProtocolHandler();
             protocol.setSSLEnabled(true);
             SSLHostConfig ssl = new SSLHostConfig();
-            ssl.setHostName(SSLHostConfig.DEFAULT_SSL_HOST_NAME);
             ssl.setProtocols("TLSv1.2+TLSv1.3");
             ssl.setCertificateVerification("required");
             ssl.setCaCertificateFile(p.caFile());
