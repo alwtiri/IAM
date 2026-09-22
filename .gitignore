@@ -21,3 +21,6 @@ deploy/compose/secrets/*
 *.iml
 .vscode/
 .DS_Store
+
+# Git bundles used to move commits between machines (never committed)
+*.bundle

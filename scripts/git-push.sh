@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Commit and push the working tree safely.
+# Checkpoint push (ADR-0017): commit the working tree and push ONCE, at a logical checkpoint
+# (phase gate, milestone, before a risky change). For everyday recovery points use plain `git commit`.
 #
 #   ./scripts/git-push.sh "commit message"            # push current branch
 #   ./scripts/git-push.sh "commit message" my-branch  # switch/create branch first
@@ -27,10 +28,14 @@ if [ "$branch" = "main" ] && [ "${ALLOW_MAIN:-0}" != "1" ]; then
   exit 1
 fi
 
+echo "Branch: $branch"
+git status --short | head -20
+[ -z "$(git diff --name-only --diff-filter=U)" ] || { echo "ABORT: unresolved merge conflicts." >&2; exit 1; }
+
 git add -A
 
 # Secret guard: anything matching these patterns aborts the commit.
-blocked='^deploy/compose/secrets/[^/]*$|(^|/)\.env$|\.pem$|\.key$|id_rsa|id_ed25519|vault-dev-init\.json$'
+blocked='^deploy/compose/secrets/[^/]*$|(^|/)\.env$|\.pem$|\.key$|id_rsa|id_ed25519|vault-dev-init\.json$|\.bundle$'
 bad="$(git diff --cached --name-only | grep -E "$blocked" | grep -v '/\.gitkeep$' || true)"
 if [ -n "$bad" ]; then
   echo "ABORT: these staged files look like secrets:" >&2
