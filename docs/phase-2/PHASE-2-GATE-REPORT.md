@@ -6,7 +6,7 @@
 | Date | 2026-09-22 |
 | Authorization | Phase 1 gate approved by the owner on 2026-09-21 with condition C1 open |
 | Design | [PHASE-2-DESIGN.md](PHASE-2-DESIGN.md) · ADR-0015 (JdbcClient persistence) · ADR-0016 (BFF authentication and bootstrap) |
-| Status | **Submitted for gate approval; C2 verified on the owner's server (see §6.1). Phase 3 not started** |
+| Status | **Submitted for gate approval. C2 runtime checks complete (27/27 on the owner's server, §6.1); the green Security-scans job on PR `phase-2-closeout` is the last CI item. Phase 3 not started** |
 | Decision requested | Approve Phase 2 subject to condition **C2** (§6) and authorize Phase 3 — Core Providers |
 
 ---
@@ -109,7 +109,7 @@ The Phase 1 run on the owner's server already confirmed a good share of the Phas
 | 1. Build and tests | **Met in CI.** The "Backend build, unit & architecture tests" job passed on PR #1: compile, unit tests, ArchUnit/Modulith, endpoint coverage, and the provider contract kit. | GitHub Actions, PR #1 checks |
 | 2. Stack and migrations | **Met.** All services are healthy and V1–V8 are applied. The System Health page shows 6/6 components HEALTHY. | Owner's server `registry` |
 | 3. Smoke test | **Met: 23/23 PASS** with `deploy/compose/scripts/smoke-phase2.sh` (run `SMOKE-1790030712`). Covers login and bootstrap; org unit, person, and identity with activation; scoped HELPDESK grant with step-up, duplicate rejected (409), and revoke; 404 for unknown objects, 400 validation, 403 without CSRF, 401 without session, actuator hidden; provider credential stored only in Vault (not in the response, GET, or logs) and secret-looking setting keys rejected; audit list, chain valid, DB UPDATE blocked; lifecycle e-mail in Mailpit. | Server console output |
-| 3a. Vault outage (503 `SECRETS_UNAVAILABLE`, identities still readable) | **Pending a runtime run.** Covered by unit tests (`VaultClientTest`, `ProviderRegistryServiceTest`). Runtime check: `smoke-phase2.sh --vault-down`. | — |
+| 3a. Vault outage (503 `SECRETS_UNAVAILABLE`, identities still readable) | **Met: 4/4 PASS** with `smoke-phase2.sh --vault-down` (run `SMOKE-1790039381`, 27/27 overall). With Vault stopped, the non-secret API answers 200, provider registration returns 503 `SECRETS_UNAVAILABLE`, and health reports vault UNAVAILABLE. Vault then restarted and unsealed cleanly. | Server console output |
 | 4. Defects fixed within Phase 2 | **Met.** See the list below. | Commits on `main` and `phase-2-closeout` |
 
 Defects found and fixed during C2:
