@@ -6,6 +6,7 @@ import com.enterprise.iam.core.identity.api.IdentityLifecycleChanged;
 import com.enterprise.iam.core.identity.api.IdentitySummary;
 import com.enterprise.iam.core.notification.domain.NotificationTemplates;
 import com.enterprise.iam.core.operation.api.OutboxPublisher;
+import com.enterprise.iam.core.request.api.AccessRequestChanged;
 import com.enterprise.iam.kernel.Ids;
 import java.time.Clock;
 import java.util.HashMap;
@@ -49,6 +50,19 @@ public class NotificationService {
         v.put("role", e.roleCode());
         v.put("reference", e.assignmentId().toString());
         email(e.identityId(), template, v);
+    }
+
+    public void on(AccessRequestChanged e) {
+        boolean pending = "PENDING_APPROVAL".equals(e.status());
+        for (UUID who : e.recipients()) {
+            Map<String, String> v = new HashMap<>();
+            v.put("role", e.roleCode());
+            v.put("requester", e.requesterName() == null ? "A user" : e.requesterName());
+            v.put("status", e.status());
+            v.put("reason", e.reason() == null ? "" : e.reason());
+            v.put("reference", e.requestId().toString());
+            email(who, pending ? "access-request.pending" : "access-request.decided", v);
+        }
     }
 
     public void on(IdentityLifecycleChanged e) {

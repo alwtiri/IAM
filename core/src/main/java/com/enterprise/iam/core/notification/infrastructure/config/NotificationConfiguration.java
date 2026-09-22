@@ -4,6 +4,7 @@ import com.enterprise.iam.core.authorization.api.RoleAssignmentChanged;
 import com.enterprise.iam.core.shared.api.health.NetworkProbes;
 import com.enterprise.iam.core.identity.api.IdentityDirectory;
 import com.enterprise.iam.core.identity.api.IdentityLifecycleChanged;
+import com.enterprise.iam.core.request.api.AccessRequestChanged;
 import com.enterprise.iam.core.notification.application.NotificationService;
 import com.enterprise.iam.core.notification.infrastructure.mail.SmtpDispatcher;
 import com.enterprise.iam.core.operation.api.OutboxPublisher;
@@ -95,6 +96,11 @@ class NotificationConfiguration {
 
         @EventListener
         void onIdentityLifecycle(IdentityLifecycleChanged e) {
+            service.on(e);
+        }
+
+        @EventListener
+        void onAccessRequest(AccessRequestChanged e) {
             service.on(e);
         }
     }

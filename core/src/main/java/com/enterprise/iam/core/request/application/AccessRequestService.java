@@ -9,10 +9,12 @@ import com.enterprise.iam.core.identity.api.IdentitySummary;
 import com.enterprise.iam.core.policy.api.PolicyDecision;
 import com.enterprise.iam.core.policy.api.PolicyDecisionPoint;
 import com.enterprise.iam.core.policy.api.RequestContext;
+import com.enterprise.iam.core.request.api.AccessRequestChanged;
 import com.enterprise.iam.core.request.api.AccessRequestView;
 import com.enterprise.iam.core.request.api.RequestableRole;
 import com.enterprise.iam.core.request.domain.AccessRequest;
 import com.enterprise.iam.core.request.domain.ApprovalStep;
+import com.enterprise.iam.core.shared.api.events.DomainEventPublisher;
 import com.enterprise.iam.core.shared.api.security.AccessGuard;
 import com.enterprise.iam.core.shared.api.security.CurrentActor;
 import com.enterprise.iam.core.shared.api.security.Permissions;
@@ -58,11 +60,12 @@ public class AccessRequestService {
     private final SodChecker sod;
     private final AccessGuard guard;
     private final AuditRecorder audit;
+    private final DomainEventPublisher events;
     private final TransactionRunner tx;
     private final Clock clock;
 
     public AccessRequestService(RequestStore store, RoleDirectory roles, IdentityDirectory identities, PolicyDecisionPoint pdp, SodChecker sod,
-                                AccessGuard guard, AuditRecorder audit, TransactionRunner tx, Clock clock) {
+                                AccessGuard guard, AuditRecorder audit, DomainEventPublisher events, TransactionRunner tx, Clock clock) {
         this.store = store;
         this.roles = roles;
         this.identities = identities;
@@ -70,6 +73,7 @@ public class AccessRequestService {
         this.sod = sod;
         this.guard = guard;
         this.audit = audit;
+        this.events = events;
         this.tx = tx;
         this.clock = clock;
     }
@@ -139,6 +143,9 @@ public class AccessRequestService {
             store.insert(req, finalSteps);
             audit.record(actor, AuditEntry.success("access-request.submitted", "access-request", id, Map.of("role", role.code(),
                     "status", status.name(), "policies", String.join(",", decision.matchedPolicies()), "scope", scopeType)));
+            if (status == AccessRequest.Status.PENDING_APPROVAL) {
+                publishPending(req, finalSteps.get(0));
+            }
         });
         if (status == AccessRequest.Status.APPROVED) {
             fulfil(id);
@@ -192,13 +199,16 @@ public class AccessRequestService {
             audit.record(actor, AuditEntry.success(approve ? "access-request.approved-step" : "access-request.rejected", "access-request", requestId,
                     Map.of("step", String.valueOf(current.stepNo()), "role", req.roleCode(), "acr", String.valueOf(actor.acr()))));
             if (!approve) {
-                save(req.withStatus(AccessRequest.Status.REJECTED, "rejected at step " + current.stepNo() + " (" + current.describe() + ")", now), req);
+                String why = "rejected at step " + current.stepNo() + " (" + current.describe() + "): " + comment.strip();
+                save(req.withStatus(AccessRequest.Status.REJECTED, why, now), req);
+                publishOutcome(req, "REJECTED", why);
                 return false;
             }
             Optional<ApprovalStep> next = steps.stream().filter(s -> s.stepNo() > current.stepNo() && "WAITING".equals(s.status())).findFirst();
             if (next.isPresent()) {
                 store.updateStep(next.get().withStatus("PENDING"));
                 save(req.withStatus(AccessRequest.Status.PENDING_APPROVAL, null, now), req);
+                publishPending(req, next.get());
                 return false;
             }
             // All approvals collected: re-evaluate policy and SoD before granting (decisions may have changed meanwhile).
@@ -269,6 +279,7 @@ public class AccessRequestService {
             tx.run(() -> {
                 AccessRequest cur = store.find(requestId).orElseThrow();
                 save(cur.fulfilled(assignment, until, clock.instant()), cur);
+                publishOutcome(cur, "ACTIVE", "granted until " + until);
                 audit.record(system, AuditEntry.success("access-request.fulfilled", "access-request", requestId,
                         Map.of("role", req.roleCode(), "assignment", assignment.toString(), "validUntil", until.toString())));
             });
@@ -276,6 +287,7 @@ public class AccessRequestService {
             tx.run(() -> {
                 AccessRequest cur = store.find(requestId).orElseThrow();
                 save(cur.withStatus(AccessRequest.Status.FAILED, "grant failed: " + e.getMessage(), clock.instant()), cur);
+                publishOutcome(cur, "FAILED", "grant failed: " + e.getMessage());
                 audit.record(system, AuditEntry.success("access-request.failed", "access-request", requestId, Map.of("reason", String.valueOf(e.getMessage()))));
             });
         }
@@ -319,6 +331,18 @@ public class AccessRequestService {
     }
 
     // ------------------------------------------------------------------ helpers
+
+    private void publishPending(AccessRequest req, ApprovalStep step) {
+        List<UUID> approvers = "MANAGER".equals(step.approverType()) ? List.of(step.approverIdentityId())
+                : roles.activeHolders(step.approverRole()).stream().filter(h -> !h.equals(req.requesterId()) && !h.equals(req.beneficiaryId())).toList();
+        events.publish(new AccessRequestChanged(req.id(), req.requesterId(), name(req.requesterId()), req.roleCode(), "PENDING_APPROVAL", null,
+                approvers));
+    }
+
+    private void publishOutcome(AccessRequest req, String status, String reason) {
+        events.publish(new AccessRequestChanged(req.id(), req.requesterId(), name(req.requesterId()), req.roleCode(), status, reason,
+                List.of(req.requesterId())));
+    }
 
     private void save(AccessRequest next, AccessRequest current) {
         if (!store.update(next, current.version())) {

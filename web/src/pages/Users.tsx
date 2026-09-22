@@ -83,7 +83,8 @@ export function UsersPage() {
 function AddUserDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (u: Identity) => void }) {
   const { t } = useLocale();
   const [units, setUnits] = useState<OrgUnit[]>([]);
-  const [form, setForm] = useState({ givenName: '', familyName: '', email: '', orgUnitId: '', type: 'EMPLOYEE', username: '', activate: true });
+  const [form, setForm] = useState({ givenName: '', familyName: '', email: '', orgUnitId: '', type: 'EMPLOYEE', username: '', activate: true, managerPersonId: '' });
+  const [people, setPeople] = useState<Identity[]>([]);
   const [error, setError] = useState<unknown>();
   const [saving, setSaving] = useState(false);
 
@@ -92,6 +93,7 @@ function AddUserDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
       setUnits(p.items);
       setForm((f) => ({ ...f, orgUnitId: f.orgUnitId || (p.items[0]?.id ?? '') }));
     }, setError);
+    apiFetch<Page<Identity>>('/api/v1/identities?state=ACTIVE&limit=200').then((p) => setPeople(p.items), () => undefined);
   }, []);
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,7 +113,7 @@ function AddUserDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
     try {
       const person = await apiFetch<{ id: string }>('/api/v1/persons', {
         method: 'POST',
-        body: JSON.stringify({ givenName: form.givenName, familyName: form.familyName, email: form.email || null, orgUnitId: form.orgUnitId, employmentStatus: 'ACTIVE' }),
+        body: JSON.stringify({ givenName: form.givenName, familyName: form.familyName, email: form.email || null, orgUnitId: form.orgUnitId, employmentStatus: 'ACTIVE', managerPersonId: form.managerPersonId || null }),
       });
       let identity = await apiFetch<Identity>('/api/v1/identities', {
         method: 'POST', body: JSON.stringify({ personId: person.id, type: form.type, username: form.username }),
@@ -141,6 +143,10 @@ function AddUserDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
           <TextField label={t.email} type="email" value={form.email} onChange={set('email')} helperText={t.emailForLogin} />
           <TextField select required label={t.orgUnit} value={form.orgUnitId} onChange={set('orgUnitId')}>
             {units.map((u) => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
+          </TextField>
+          <TextField select label={t.manager} value={form.managerPersonId} onChange={set('managerPersonId')} helperText={t.managerHelp}>
+            <MenuItem value="">—</MenuItem>
+            {people.map((p) => <MenuItem key={p.id} value={p.personId}>{p.displayName} ({p.username})</MenuItem>)}
           </TextField>
           <TextField select label={t.identityType} value={form.type} onChange={set('type')}>
             {IDENTITY_TYPES.map((x) => <MenuItem key={x} value={x}>{x}</MenuItem>)}

@@ -164,6 +164,7 @@ class AccessRequestServiceTest {
     final MemoryStore store = new MemoryStore();
     final Roles roles = new Roles();
     final List<AuditEntry> audit = new ArrayList<>();
+    final List<Object> published = new ArrayList<>();
     final List<Policy> policies = List.of(
             new Policy(UUID.randomUUID(), "P-100", "Standard", null, true, "ALLOW", "ROLE", null, null, List.of("MANAGER"), true, 180, 0),
             new Policy(UUID.randomUUID(), "P-200", "Privileged", null, true, "ALLOW", "ROLE",
@@ -186,7 +187,7 @@ class AccessRequestServiceTest {
     };
     final AccessRequestService service = new AccessRequestService(store, roles, identities, ctx -> PolicyEvaluator.evaluate(policies, ctx),
             (held, requested) -> rules.stream().flatMap(r -> r.conflict(held, requested).stream()).toList(),
-            TestSupport.guard(true), (a, e) -> audit.add(e), TestSupport.DIRECT_TX, clock);
+            TestSupport.guard(true), (a, e) -> audit.add(e), published::add, TestSupport.DIRECT_TX, clock);
 
     AccessRequestServiceTest() {
         for (UUID id : List.of(alice, manager, sec)) {
@@ -219,6 +220,10 @@ class AccessRequestServiceTest {
         assertNotNull(done.roleAssignmentId());
         assertEquals(Instant.parse("2026-10-22T10:00:00Z"), done.validUntil());
         assertEquals(List.of("HELPDESK ORG_UNIT until 2026-10-22T10:00:00Z"), roles.grants);
+        var events = published.stream().map(e -> (com.enterprise.iam.core.request.api.AccessRequestChanged) e).toList();
+        assertEquals(List.of("PENDING_APPROVAL", "ACTIVE"), events.stream().map(com.enterprise.iam.core.request.api.AccessRequestChanged::status).toList());
+        assertEquals(List.of(manager), events.get(0).recipients());
+        assertEquals(List.of(alice), events.get(1).recipients());
     }
 
     @Test

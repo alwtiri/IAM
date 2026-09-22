@@ -8,6 +8,7 @@ import com.enterprise.iam.core.policy.api.PolicyDecisionPoint;
 import com.enterprise.iam.core.request.application.AccessRequestService;
 import com.enterprise.iam.core.request.application.RequestStore;
 import com.enterprise.iam.core.request.infrastructure.persistence.JdbcRequestStore;
+import com.enterprise.iam.core.shared.api.events.DomainEventPublisher;
 import com.enterprise.iam.core.shared.api.security.AccessGuard;
 import com.enterprise.iam.core.shared.api.tx.TransactionRunner;
 import com.enterprise.iam.core.sod.api.SodChecker;
@@ -28,8 +29,9 @@ class RequestConfiguration {
 
     @Bean
     AccessRequestService accessRequestService(RequestStore store, RoleDirectory roles, IdentityDirectory identities, PolicyDecisionPoint pdp,
-                                              SodChecker sod, AccessGuard guard, AuditRecorder audit, TransactionRunner tx, Clock clock) {
-        return new AccessRequestService(store, roles, identities, pdp, sod, guard, audit, tx, clock);
+                                              SodChecker sod, AccessGuard guard, AuditRecorder audit, DomainEventPublisher events,
+                                              TransactionRunner tx, Clock clock) {
+        return new AccessRequestService(store, roles, identities, pdp, sod, guard, audit, events, tx, clock);
     }
 
     @Bean

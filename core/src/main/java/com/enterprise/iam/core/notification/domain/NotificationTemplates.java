@@ -27,6 +27,11 @@ public final class NotificationTemplates {
                     "Hello {{displayName}},\n\nThe role {{role}} has been removed from your identity {{username}}.\n\nReference: {{reference}}\n"),
             "role-assignment.expired", new Template("Access expired: {{role}}",
                     "Hello {{displayName}},\n\nYour time-limited role {{role}} on identity {{username}} has expired.\n\nReference: {{reference}}\n"),
+            "access-request.pending", new Template("Approval needed: {{role}} for {{requester}}",
+                    "Hello {{displayName}},\n\n{{requester}} requested the role {{role}} and your approval is needed.\n"
+                            + "Open the platform: Identity & Access > Approvals.\n\nReference: {{reference}}\n"),
+            "access-request.decided", new Template("Your access request for {{role}}: {{status}}",
+                    "Hello {{displayName}},\n\nYour request for the role {{role}} is now {{status}}.\n{{reason}}\n\nReference: {{reference}}\n"),
             "identity.lifecycle", new Template("Identity {{username}} is now {{state}}",
                     "Hello {{displayName}},\n\nYour identity {{username}} changed from {{from}} to {{state}}.\nReason: {{reason}}\n\n"
                             + "Reference: {{reference}}\n"));
