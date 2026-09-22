@@ -160,6 +160,27 @@ public class JdbcAuthorizationStore implements AuthorizationStore {
                 ORDER BY valid_until LIMIT :limit FOR UPDATE SKIP LOCKED""", Map.of("now", ts(now), "limit", limit));
     }
 
+    @Override
+    public List<String> activeRoleCodes(UUID identityId, Instant now) {
+        return jdbc.sql("""
+                SELECT DISTINCT r.code FROM "authorization".role_assignment ra
+                JOIN "authorization".role r ON r.id = ra.role_id
+                JOIN identity.identity i ON i.id = ra.identity_id AND i.state = 'ACTIVE'
+                WHERE ra.identity_id = :identity AND ra.status = 'ACTIVE'
+                  AND ra.valid_from <= :now AND (ra.valid_until IS NULL OR ra.valid_until > :now)
+                ORDER BY r.code""").param("identity", identityId).param("now", ts(now)).query(String.class).list();
+    }
+
+    @Override
+    public List<UUID> activeHolders(String roleCode, Instant now) {
+        return jdbc.sql("""
+                SELECT DISTINCT ra.identity_id FROM "authorization".role_assignment ra
+                JOIN "authorization".role r ON r.id = ra.role_id AND r.code = :code
+                JOIN identity.identity i ON i.id = ra.identity_id AND i.state = 'ACTIVE'
+                WHERE ra.status = 'ACTIVE' AND ra.valid_from <= :now AND (ra.valid_until IS NULL OR ra.valid_until > :now)""")
+                .param("code", roleCode).param("now", ts(now)).query(UUID.class).list();
+    }
+
     // ------------------------------------------------------------------------------------------------ helpers
 
     private List<RoleAssignment> load(String sql, Map<String, ?> params) {

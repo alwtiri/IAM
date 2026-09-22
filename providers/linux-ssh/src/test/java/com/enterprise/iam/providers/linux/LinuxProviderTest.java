@@ -51,6 +51,9 @@ class LinuxProviderTest {
         final Map<String, User> users = new LinkedHashMap<>();
         final List<String> commands = new ArrayList<>();
         String refuse; // "auth" or "connect"
+        String lastStdin;
+        final Map<String, String> passwords = new LinkedHashMap<>();
+        String lastChange = "Jan 01, 2026";
         boolean faillock = true;
 
         FakeHost() {
@@ -73,6 +76,7 @@ class LinuxProviderTest {
                 @Override
                 public Exec exec(String command, byte[] stdin, Duration timeout) {
                     commands.add(command);
+                    lastStdin = stdin == null ? null : new String(stdin, java.nio.charset.StandardCharsets.UTF_8);
                     return run(command);
                 }
 
@@ -135,6 +139,16 @@ class LinuxProviderTest {
             }
             if (c.startsWith("if command -v faillock") && c.contains("grep -c")) {
                 return new SshTransport.Exec(0, users.get(name(c)).failures + "\n", "");
+            }
+            if (c.equals("sudo -n chpasswd")) {
+                String[] kv = lastStdin.strip().split(":", 2);
+                passwords.put(kv[0], kv[1]);
+                lastChange = java.time.format.DateTimeFormatter.ofPattern("MMM dd, yyyy", java.util.Locale.ENGLISH)
+                        .format(java.time.LocalDate.now(java.time.ZoneOffset.UTC));
+                return new SshTransport.Exec(0, "", "");
+            }
+            if (c.startsWith("sudo -n chage -l '") && c.contains("Last password change")) {
+                return new SshTransport.Exec(0, lastChange + "\n", "");
             }
             if (c.startsWith("uname -sr")) {
                 return new SshTransport.Exec(0, "Linux 6.8.0\nUbuntu 24.04 LTS\nSUDO_OK\n", "");
@@ -251,6 +265,19 @@ class LinuxProviderTest {
                 "ssh://srv01", Map.of("username", "svc-iam"), new CredentialHandle("ch_x"))), "host key fingerprint required");
         assertThrows(IllegalArgumentException.class, () -> f.create(new ProviderConnection(UUID.randomUUID(), LinuxProvider.TYPE,
                 "https://srv01", Map.of("username", "svc-iam", "allowUnknownHostKey", "true"), new CredentialHandle("ch_x"))));
+    }
+
+    @Test
+    void rotationSendsThePasswordOnStdinAndVerifiesTheChangeDate() {
+        OperationContext ctx = new OperationContext(UUID.randomUUID(), "key-12345678", "corr-12345678", 1, Instant.now().plusSeconds(60),
+                h -> Secret.of(h.value().equals("ch_new") ? "N3w-Pa55word!" : "-----BEGIN OPENSSH PRIVATE KEY-----\n..."));
+        var r = provider.rotatePassword(ctx, new com.enterprise.iam.provider.spi.model.PasswordChange(new AccountRef("bob", "bob"), null,
+                new CredentialHandle("ch_new")));
+        assertEquals(OperationOutcome.SUCCEEDED, r.outcome(), r.toString());
+        assertEquals("N3w-Pa55word!", host.passwords.get("bob"));
+        assertTrue(host.commands.stream().noneMatch(c -> c.contains("N3w-Pa55word!")), "password never on a command line");
+        assertEquals("PROTECTED_ACCOUNT", provider.rotatePassword(ctx, new com.enterprise.iam.provider.spi.model.PasswordChange(
+                new AccountRef("svc-iam", "svc-iam"), null, new CredentialHandle("ch_new"))).error().orElseThrow().code());
     }
 
     @Test

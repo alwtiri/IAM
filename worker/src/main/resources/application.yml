@@ -25,13 +25,14 @@ server:
 iam:
   worker:
     instance: ${IAM_WORKER_INSTANCE:}
-    pools: ${IAM_WORKER_POOLS:linux-ssh,active-directory,windows-winrm,generic-rest}
+    pools: ${IAM_WORKER_POOLS:linux-ssh,active-directory,windows-winrm,generic-rest,postgresql}
     default-concurrency: 4
     concurrency:
       linux-ssh: 8
       active-directory: 4
       windows-winrm: 4
       generic-rest: 4
+      postgresql: 4
     bulkhead: 4
     core-internal-url: ${IAM_CORE_INTERNAL_URL:https://iam-core:8443}
     cert-file: /run/secrets/pki_worker_crt

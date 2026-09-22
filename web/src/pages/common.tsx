@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Alert, Box, Button, CircularProgress, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material';
 import { ApiError, apiFetch, startStepUp } from '../api/client';
 import type { Page } from '../api/types';
 import { useLocale } from '../i18n/LocaleContext';
@@ -45,11 +45,12 @@ export function usePaged<T>(path: string) {
     void load();
   }, [load]);
 
-  return { items, cursor, loading, error, loadMore: () => load(cursor) };
+  return { items, cursor, loading, error, loadMore: () => load(cursor), reload: () => load() };
 }
 
-export function DataTable<T>({ title, columns, rows, rowKey, footer }: {
+export function DataTable<T>({ title, columns, rows, rowKey, footer, hideTitle = false }: {
   title: string;
+  hideTitle?: boolean;
   columns: { header: string; cell: (row: T) => ReactNode }[];
   rows: T[];
   rowKey: (row: T) => string;
@@ -57,7 +58,8 @@ export function DataTable<T>({ title, columns, rows, rowKey, footer }: {
 }) {
   return (
     <Box>
-      <Typography variant="h5" component="h2" gutterBottom>{title}</Typography>
+      {!hideTitle && <Typography variant="h5" component="h2" sx={{ mb: 1.5 }}>{title}</Typography>}
+      <TableContainer sx={{ overflowX: 'auto' }}>
       <Table size="small" aria-label={title}>
         <TableHead>
           <TableRow>{columns.map((c) => <TableCell key={c.header}>{c.header}</TableCell>)}</TableRow>
@@ -66,9 +68,13 @@ export function DataTable<T>({ title, columns, rows, rowKey, footer }: {
           {rows.map((r) => (
             <TableRow key={rowKey(r)}>{columns.map((c) => <TableCell key={c.header}>{c.cell(r)}</TableCell>)}</TableRow>
           ))}
+          {rows.length === 0 && (
+            <TableRow><TableCell colSpan={columns.length} sx={{ py: 5, textAlign: 'center', color: 'text.secondary' }}>—</TableCell></TableRow>
+          )}
         </TableBody>
       </Table>
-      {footer}
+      </TableContainer>
+      {footer && <Box sx={{ mt: 1.5 }}>{footer}</Box>}
     </Box>
   );
 }

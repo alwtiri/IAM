@@ -58,6 +58,18 @@ export interface Target {
   environment: string;
   criticality: string;
   status: string;
+  ipAddress?: string | null;
+  dnsName?: string | null;
+  platform?: string | null;
+  operatingSystem?: string | null;
+  classification?: string | null;
+  ownerOrgUnitId?: string | null;
+  ownerIdentityId?: string | null;
+  technicalOwnerIdentityId?: string | null;
+  businessOwnerIdentityId?: string | null;
+  locationId?: string | null;
+  tags?: string[];
+  version?: number;
 }
 
 export interface ProviderInstance {
@@ -68,6 +80,8 @@ export interface ProviderInstance {
   credentialConfigured: boolean;
   enabled: boolean;
   health: string;
+  settings?: Record<string, string>;
+  version?: number;
 }
 
 export interface ComponentHealth {
@@ -82,6 +96,88 @@ export interface ComponentHealth {
 export interface SystemHealth {
   status: ComponentHealth['status'];
   components: ComponentHealth[];
+}
+
+export interface OrgUnit {
+  id: string;
+  parentId: string | null;
+  kind: string;
+  code: string;
+  name: string;
+  path: string;
+}
+
+export interface ProviderBinding {
+  targetId: string;
+  providerInstanceId: string;
+  providerType: string;
+  providerName: string;
+  channel: string | null;
+}
+
+export interface Submitted {
+  operationId: string;
+  discoveryRunId: string | null;
+}
+
+export type OperationStatus = 'QUEUED' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'TIMEOUT' | 'CANCELLED' | 'PARTIAL' | 'UNKNOWN';
+
+export interface Operation {
+  id: string;
+  type: string;
+  status: OperationStatus;
+  statusReason: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  verificationSummary: string | null;
+  finishedAt: string | null;
+  createdAt?: string;
+  targetId?: string | null;
+}
+
+export interface DiscoveryRun {
+  id: string;
+  providerInstanceId: string;
+  operationId: string;
+  status: string;
+  startedAt: string;
+  finishedAt: string | null;
+  accountsSeen: number;
+  accountsNew: number;
+  accountsRemoved: number;
+  errorMessage: string | null;
+}
+
+export interface Account {
+  id: string;
+  targetId: string;
+  targetName: string;
+  providerInstanceId: string;
+  providerType: string;
+  nativeId: string | null;
+  name: string;
+  displayName: string | null;
+  type: string;
+  privileged: boolean;
+  privilegeReason: string | null;
+  governanceState: string;
+  nativeStatus: string;
+  attributes: Record<string, string>;
+  lastSeenAt: string | null;
+  lastLoginAt: string | null;
+  openFindings: string[];
+  version: number;
+}
+
+export interface AccountFinding {
+  id: string;
+  accountId: string;
+  accountName: string;
+  targetId: string;
+  targetName: string;
+  type: string;
+  severity: string;
+  detectedAt: string;
 }
 
 export function hasPermission(access: EffectiveAccess | undefined, permission: string): boolean {

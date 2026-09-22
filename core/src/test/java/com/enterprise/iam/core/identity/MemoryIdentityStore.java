@@ -58,6 +58,12 @@ final class MemoryIdentityStore implements IdentityStore {
     }
 
     @Override
+    public Optional<UUID> activeIdentityOfPerson(UUID personId) {
+        return identities.values().stream().filter(i -> i.personId().equals(personId) && i.state() == IdentityState.ACTIVE)
+                .map(Identity::id).findFirst();
+    }
+
+    @Override
     public boolean employeeIdExists(String employeeId, UUID exceptPersonId) {
         return persons.values().stream().anyMatch(p -> employeeId.equals(p.employeeId()) && !p.id().equals(exceptPersonId));
     }
@@ -139,6 +145,11 @@ final class MemoryIdentityStore implements IdentityStore {
     @Override
     public boolean hasPlatformUser(UUID identityId) {
         return subjects.containsValue(identityId);
+    }
+
+    @Override
+    public Optional<String> subjectOf(UUID identityId) {
+        return subjects.entrySet().stream().filter(e -> e.getValue().equals(identityId)).map(Map.Entry::getKey).findFirst();
     }
 
     @Override

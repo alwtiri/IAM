@@ -175,5 +175,22 @@ final class AuthorizationFixture {
             return assignments.values().stream().filter(a -> a.status() == RoleAssignment.Status.ACTIVE && a.validUntil() != null
                     && !now.isBefore(a.validUntil())).limit(limit).toList();
         }
+
+        @Override
+        public List<String> activeRoleCodes(UUID identityId, Instant now) {
+            IdentitySummary s = identities.get(identityId);
+            if (s == null || !"ACTIVE".equals(s.state())) {
+                return List.of();
+            }
+            return assignments.values().stream().filter(a -> a.identityId().equals(identityId) && a.isEffective(now))
+                    .map(a -> roles.get(a.roleId()).code()).distinct().sorted().toList();
+        }
+
+        @Override
+        public List<UUID> activeHolders(String roleCode, Instant now) {
+            return assignments.values().stream().filter(a -> a.isEffective(now) && roles.get(a.roleId()).code().equals(roleCode))
+                    .map(RoleAssignment::identityId).filter(id -> identities.get(id) != null && "ACTIVE".equals(identities.get(id).state()))
+                    .distinct().toList();
+        }
     }
 }

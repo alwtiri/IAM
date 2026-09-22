@@ -11,4 +11,9 @@ public interface IdentityDirectory {
     default Optional<IdentitySummary> findByUsername(String username) {
         return Optional.empty();
     }
+
+    /** ACTIVE identity of the person's manager (approvals); empty when no manager or no active identity. */
+    default Optional<UUID> managerIdentityOf(UUID identityId) {
+        return Optional.empty();
+    }
 }

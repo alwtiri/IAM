@@ -42,6 +42,17 @@ class ProviderController {
         }
     }
 
+    record UpdateRequest(@NotBlank @Size(max = 500) String endpoint, @Size(max = 50) Map<String, String> settings,
+                         @Size(max = 16384) String credential) {
+        @Override
+        public String toString() {
+            return "UpdateRequest[endpoint=" + endpoint + ", credential=REDACTED]";
+        }
+    }
+
+    record DeleteRequest(@Size(max = 500) String reason) {
+    }
+
     private final ProviderRegistryService providers;
     private final CurrentActorProvider actors;
 
@@ -66,6 +77,30 @@ class ProviderController {
             return providers.register(actors.require(),
                     new ProviderRegistryService.RegisterCommand(r.type(), r.name(), r.endpoint(), r.settings(), credential));
         }
+    }
+
+    @org.springframework.web.bind.annotation.PatchMapping("/provider-instances/{id}")
+    @RequiresPermission(Permissions.PROVIDER_WRITE)
+    @RequiresStepUp
+    ProviderInstanceView update(@PathVariable UUID id, @Valid @RequestBody UpdateRequest r) {
+        try (Secret credential = r.credential() == null || r.credential().isEmpty() ? null : Secret.of(r.credential())) {
+            return providers.update(actors.require(), id, new ProviderRegistryService.UpdateCommand(r.endpoint(), r.settings(), credential));
+        }
+    }
+
+    @DeleteMapping("/provider-instances/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @RequiresPermission(Permissions.PROVIDER_WRITE)
+    void retire(@PathVariable UUID id) {
+        providers.retire(actors.require(), id);
+    }
+
+    /** Deleting a server lives here because it also retires the server's connections (provider module owns them). */
+    @DeleteMapping("/targets/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @RequiresPermission(Permissions.TARGET_WRITE)
+    void deleteTarget(@PathVariable UUID id, @Valid @RequestBody(required = false) DeleteRequest r) {
+        providers.deleteTarget(actors.require(), id, r == null ? null : r.reason());
     }
 
     @GetMapping("/provider-instances/{id}")

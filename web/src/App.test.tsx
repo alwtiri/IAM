@@ -25,18 +25,19 @@ describe('App shell', () => {
   beforeEach(() => vi.stubGlobal('fetch', mockApi({ '/api/v1/me': { status: 200, body: me }, '/api/v1/system/health': { status: 200, body: health } })));
   afterEach(() => vi.unstubAllGlobals());
 
-  it('shows the signed-in identity, the §61 navigation, and the health dashboard', async () => {
+  it('shows the signed-in identity, the §61 navigation, and the dashboard with platform health', async () => {
     render(<App inMemoryRouter />);
-    expect(await screen.findByText(/Platform Administrator/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Platform Administrator/))[0]).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'main navigation' })).toBeInTheDocument();
     expect(screen.getByText(messages.en.nav.identityAccess)).toBeInTheDocument();
+    expect(await screen.findByText(messages.en.kpiServers)).toBeInTheDocument();
     expect(await screen.findByText('vault')).toBeInTheDocument();
-    expect(screen.getByText(/standby node — Storing and using credentials/)).toBeInTheDocument();
+    expect(screen.getByText('DEGRADED')).toBeInTheDocument();
   });
 
   it('switches to Arabic and right-to-left', async () => {
     render(<App inMemoryRouter />);
-    await screen.findByText(/Platform Administrator/);
+    await screen.findAllByText(/Platform Administrator/);
     fireEvent.click(screen.getByRole('button', { name: messages.en.switchLanguage }));
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(messages.ar.appTitle);
     expect(document.documentElement.dir).toBe('rtl');

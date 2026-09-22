@@ -1,0 +1,4 @@
+# Least-privilege sudo for the IAM platform service account (linux-ssh provider, Phase 3).
+# Read: passwd -S, chage -l. Change: usermod (lock/unlock/expire), chpasswd (vaulted password rotation). Unlock counters: faillock. Validation: true.
+Defaults:svc-iam !requiretty
+svc-iam ALL=(root) NOPASSWD: /usr/bin/true, /usr/bin/passwd -S *, /usr/bin/passwd -S -a, /usr/bin/chage -l *, /usr/sbin/usermod, /usr/sbin/faillock, /usr/sbin/chpasswd

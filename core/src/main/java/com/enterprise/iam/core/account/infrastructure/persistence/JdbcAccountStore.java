@@ -32,7 +32,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 public class JdbcAccountStore implements AccountStore {
 
     private static final ScopeSql.Columns SCOPE = new ScopeSql.Columns("ou.path", "t.environment", "p.type", "a.provider_instance_id", "a.target_id");
-    private static final String FROM = """
+    // Leading space: text blocks strip common indentation, so the clause must not be glued to the column list.
+    private static final String FROM = " " + """
              FROM account.account a
              JOIN target.target t ON t.id = a.target_id
              JOIN organization.org_unit ou ON ou.id = t.owner_org_unit_id
@@ -120,7 +121,8 @@ public class JdbcAccountStore implements AccountStore {
     @Override
     public List<Scoped> list(ScopeFilter filter, ListFilter f, PageRequest page) {
         Map<String, Object> params = new HashMap<>();
-        StringBuilder sql = new StringBuilder(SELECT).append(" WHERE ").append(ScopeSql.predicate(filter, SCOPE, params, "s_"));
+        StringBuilder sql = new StringBuilder(SELECT).append(" WHERE ").append(ScopeSql.predicate(filter, SCOPE, params, "s_"))
+                .append(" AND t.status <> 'DECOMMISSIONED'");
         if (f.targetId() != null) {
             sql.append(" AND a.target_id = :target");
             params.put("target", f.targetId());

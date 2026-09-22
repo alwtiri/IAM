@@ -100,7 +100,7 @@ class OperationConfiguration {
      * running yet. Arguments must stay identical to the worker's declaration.
      */
     @Bean
-    Declarables providerQueues(@Value("${iam.operations.provider-types:linux-ssh,active-directory,windows-winrm,generic-rest}") List<String> types) {
+    Declarables providerQueues(@Value("${iam.operations.provider-types:linux-ssh,active-directory,windows-winrm,generic-rest,postgresql}") List<String> types) {
         List<Declarable> out = new ArrayList<>();
         for (String type : types) {
             Queue q = QueueBuilder.durable("ops." + type).deadLetterExchange("iam.ops.dlx").maxLength(100_000).overflow(QueueBuilder.Overflow.rejectPublish).build();

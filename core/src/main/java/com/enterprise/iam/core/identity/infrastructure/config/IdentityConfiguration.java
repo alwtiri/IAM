@@ -3,7 +3,11 @@ package com.enterprise.iam.core.identity.infrastructure.config;
 import com.enterprise.iam.core.audit.api.AuditRecorder;
 import com.enterprise.iam.core.identity.application.ActorResolver;
 import com.enterprise.iam.core.identity.application.IdentityService;
+import com.enterprise.iam.core.identity.api.IdentityLifecycleChanged;
 import com.enterprise.iam.core.identity.application.IdentityStore;
+import com.enterprise.iam.core.identity.application.LoginAccountProvisioner;
+import com.enterprise.iam.core.identity.application.PlatformLoginService;
+import com.enterprise.iam.core.identity.infrastructure.keycloak.KeycloakLoginProvisioner;
 import com.enterprise.iam.core.identity.application.PersonService;
 import com.enterprise.iam.core.identity.infrastructure.persistence.JdbcIdentityStore;
 import com.enterprise.iam.core.identity.infrastructure.security.SpringSecurityActorProvider;
@@ -20,6 +24,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 @Configuration(proxyBeanMethods = false)
 class IdentityConfiguration {
@@ -41,6 +47,53 @@ class IdentityConfiguration {
     IdentityService identityService(IdentityStore store, AccessGuard guard, AuditRecorder audit, DomainEventPublisher events,
                                     TransactionRunner tx, Clock clock) {
         return new IdentityService(store, guard, audit, events, tx, clock);
+    }
+
+    @Bean
+    com.enterprise.iam.core.identity.application.UserAdministrationService userAdministrationService(PersonService persons,
+            IdentityService identities, IdentityStore store, TransactionRunner tx) {
+        return new com.enterprise.iam.core.identity.application.UserAdministrationService(persons, identities, store, tx);
+    }
+
+    @Bean
+    LoginAccountProvisioner loginAccountProvisioner(@Value("${iam.auth.admin.base-url:http://keycloak:8080/auth}") String baseUrl,
+                                                    @Value("${iam.auth.admin.realm:iam}") String realm,
+                                                    @Value("${iam.auth.admin.client-id:iam-core-admin}") String clientId,
+                                                    @Value("${iam.auth.admin-client-secret:}") String clientSecret,
+                                                    @Value("${iam.auth.client-id:iam-core}") String loginClientId,
+                                                    @Value("${iam.auth.post-logout-redirect-uri:http://localhost:8088/}") String redirectUri) {
+        KeycloakLoginProvisioner p = new KeycloakLoginProvisioner(baseUrl, realm, clientId, clientSecret, loginClientId, redirectUri);
+        log.info("Login provisioning through the Keycloak admin API is {}", p.enabled() ? "enabled" : "disabled (no admin client secret)");
+        return p;
+    }
+
+    @Bean
+    PlatformLoginService platformLoginService(IdentityService identities, IdentityStore store, LoginAccountProvisioner provisioner,
+                                              AccessGuard guard, AuditRecorder audit, TransactionRunner tx) {
+        return new PlatformLoginService(identities, store, provisioner, guard, audit, tx);
+    }
+
+    @Bean
+    LoginLifecycleSync loginLifecycleSync(PlatformLoginService logins) {
+        return new LoginLifecycleSync(logins);
+    }
+
+    /** Suspended or disabled identities are also blocked at Keycloak; reinstated ones are unblocked (after commit). */
+    static class LoginLifecycleSync {
+        private final PlatformLoginService logins;
+
+        LoginLifecycleSync(PlatformLoginService logins) {
+            this.logins = logins;
+        }
+
+        @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+        void on(IdentityLifecycleChanged e) {
+            try {
+                logins.onLifecycleChanged(e.identityId(), e.toState());
+            } catch (RuntimeException ex) {
+                log.warn("Could not update the Keycloak account of identity {}: {}", e.identityId(), ex.getMessage());
+            }
+        }
     }
 
     @Bean

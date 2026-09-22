@@ -5,6 +5,7 @@ import com.enterprise.iam.core.audit.api.AuditRecorder;
 import com.enterprise.iam.core.authorization.api.EffectiveAccessView;
 import com.enterprise.iam.core.authorization.api.RoleAssignmentChanged;
 import com.enterprise.iam.core.authorization.api.RoleAssignmentView;
+import com.enterprise.iam.core.authorization.api.RoleDirectory;
 import com.enterprise.iam.core.authorization.api.RoleView;
 import com.enterprise.iam.core.authorization.domain.AssignmentScope;
 import com.enterprise.iam.core.authorization.domain.Role;
@@ -30,6 +31,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -44,7 +46,7 @@ import java.util.stream.Collectors;
  *   <li>the last effective GLOBAL Platform Administrator cannot be revoked (lock-out protection).</li>
  * </ul>
  */
-public class RoleAssignmentService implements BootstrapAdministratorGrant {
+public class RoleAssignmentService implements BootstrapAdministratorGrant, RoleDirectory {
 
     public record GrantCommand(UUID identityId, UUID roleId, Set<ScopeElement> scope, Instant validFrom, Instant validUntil, String reason) {
     }
@@ -221,6 +223,56 @@ public class RoleAssignmentService implements BootstrapAdministratorGrant {
                         "You cannot grant a role containing permission " + p + " that you do not hold in this scope");
             }
         }
+    }
+
+    // ------------------------------------------------------------------ RoleDirectory (request fulfilment, SoD)
+
+    @Override
+    public List<RoleView> allRoles() {
+        return tx.readOnly(() -> store.roles().stream().map(RoleAssignmentService::view).toList());
+    }
+
+    @Override
+    public Optional<RoleView> findRole(UUID roleId) {
+        return tx.readOnly(() -> store.role(roleId).map(RoleAssignmentService::view));
+    }
+
+    @Override
+    public List<String> activeRoleCodes(UUID identityId) {
+        return tx.readOnly(() -> store.activeRoleCodes(identityId, clock.instant()));
+    }
+
+    @Override
+    public List<UUID> activeHolders(String roleCode) {
+        return tx.readOnly(() -> store.activeHolders(roleCode, clock.instant()));
+    }
+
+    @Override
+    public UUID grantForRequest(UUID identityId, UUID roleId, String scopeType, String scopeValue, Instant validUntil, UUID requestId,
+                                String reason) {
+        CurrentActor system = CurrentActor.system(SystemIdentities.SYSTEM_IDENTITY_ID);
+        return tx.inTransaction(() -> {
+            IdentitySummary beneficiary = identities.find(identityId)
+                    .orElseThrow(() -> IamException.validation("identityId", "NOT_FOUND", "identity does not exist"));
+            if (!"ACTIVE".equals(beneficiary.state())) {
+                throw IamException.validation("identityId", "INACTIVE", "roles are only granted to ACTIVE identities");
+            }
+            Role role = store.role(roleId).orElseThrow(() -> IamException.validation("roleId", "NOT_FOUND", "role does not exist"));
+            ScopeElement element = "GLOBAL".equals(scopeType) ? new ScopeElement(ScopeElement.Type.GLOBAL, "*")
+                    : new ScopeElement(ScopeElement.Type.ORG_UNIT, scopeValue);
+            Instant now = clock.instant();
+            RoleAssignment a = RoleAssignment.grant(Ids.newId(clock), identityId, role.id(), new AssignmentScope(Set.of(element)),
+                    RoleAssignment.Source.REQUEST, now, validUntil, SystemIdentities.SYSTEM_IDENTITY_ID, now, reason);
+            if (store.activeDuplicateExists(a)) {
+                throw IamException.alreadyExists("An identical active assignment");
+            }
+            store.insert(a);
+            audit.record(system, AuditEntry.success("role-assignment.granted", "role-assignment", a.id(),
+                    Map.of("identityId", identityId.toString(), "role", role.code(), "scope", describe(a.scope()),
+                            "validUntil", String.valueOf(validUntil), "source", "REQUEST", "request", requestId.toString())));
+            events.publish(new RoleAssignmentChanged(a.id(), identityId, role.code(), "GRANTED", system.identityId()));
+            return a.id();
+        });
     }
 
     static ResourceScope scopeOf(IdentitySummary s) {

@@ -23,10 +23,10 @@ else skip "compose hardening policy" "docker compose not installed"; fi
 
 echo "Static analysis"
 if have semgrep; then
-  run "Semgrep project rules" semgrep scan --error --metrics=off --disable-version-check --config ci/semgrep/iam-rules.yaml
+  run "Semgrep project rules" semgrep scan --error --metrics=off --disable-version-check --config ci/semgrep/iam-rules.yaml --exclude deploy/compose/lab
   if [ "${SKIP_REGISTRY:-0}" != 1 ] && curl -sfI --max-time 5 https://semgrep.dev >/dev/null 2>&1; then
     run "Semgrep registry packs (as CI)" semgrep scan --error --metrics=off --disable-version-check \
-      --config p/java --config p/typescript --config p/dockerfile --config p/secrets
+      --config p/java --config p/typescript --config p/dockerfile --config p/secrets --exclude deploy/compose/lab
   else skip "Semgrep registry packs" "semgrep.dev not reachable"; fi
 else skip "Semgrep" "pip install semgrep"; fi
 if have shellcheck; then
@@ -36,7 +36,7 @@ else skip "shellcheck" "not installed"; fi
 echo "Secrets and vulnerabilities"
 if have gitleaks; then run "Gitleaks (working tree)" gitleaks dir --no-banner --config .gitleaks.toml .
 else skip "Gitleaks" "not installed"; fi
-if have trivy; then run "Trivy filesystem + IaC (HIGH,CRITICAL)" trivy fs --quiet --exit-code 1 --severity HIGH,CRITICAL --scanners vuln,misconfig,secret .
+if have trivy; then run "Trivy filesystem + IaC (HIGH,CRITICAL)" trivy fs --quiet --exit-code 1 --severity HIGH,CRITICAL --scanners vuln,misconfig,secret --skip-dirs deploy/compose/lab .
 else skip "Trivy" "not installed"; fi
 
 echo

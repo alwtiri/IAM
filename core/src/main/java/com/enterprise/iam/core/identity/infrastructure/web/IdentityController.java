@@ -4,6 +4,7 @@ import com.enterprise.iam.core.identity.api.IdentityView;
 import com.enterprise.iam.core.identity.api.PersonView;
 import com.enterprise.iam.core.identity.application.IdentityService;
 import com.enterprise.iam.core.identity.application.PersonService;
+import com.enterprise.iam.core.identity.application.PlatformLoginService;
 import com.enterprise.iam.core.identity.domain.IdentityState;
 import com.enterprise.iam.core.identity.domain.IdentityType;
 import com.enterprise.iam.core.identity.domain.Person;
@@ -51,20 +52,44 @@ class IdentityController {
                                  Instant validUntil) {
     }
 
+    /** Create user in one step: person data + identity type + username (+ activate). */
+    record CreateUserRequest(@NotNull UUID orgUnitId, @Size(max = 32) String employeeId, @NotBlank @Size(max = 100) String givenName,
+                             @NotBlank @Size(max = 100) String familyName, @Size(max = 200) String displayName, UUID managerPersonId,
+                             @Size(max = 320) String email, @Size(max = 40) String phone, @NotNull IdentityType type,
+                             @NotBlank @Size(max = 64) String username, boolean activate) {
+    }
+
     record ReasonRequest(@Size(max = 500) String reason) {
     }
 
     record PlatformUserRequest(@NotBlank @Size(max = 255) String subject) {
     }
 
+    private final com.enterprise.iam.core.identity.application.UserAdministrationService users;
     private final PersonService persons;
     private final IdentityService identities;
+    private final PlatformLoginService logins;
     private final CurrentActorProvider actors;
 
-    IdentityController(PersonService persons, IdentityService identities, CurrentActorProvider actors) {
+    IdentityController(com.enterprise.iam.core.identity.application.UserAdministrationService users, PersonService persons,
+                       IdentityService identities, PlatformLoginService logins, CurrentActorProvider actors) {
+        this.users = users;
         this.persons = persons;
         this.identities = identities;
+        this.logins = logins;
         this.actors = actors;
+    }
+
+    // ---- users (person + identity)
+
+    @PostMapping("/users")
+    @ResponseStatus(HttpStatus.CREATED)
+    @RequiresPermission(Permissions.IDENTITY_WRITE)
+    IdentityView createUser(@Valid @RequestBody CreateUserRequest r) {
+        return users.create(actors.require(), new com.enterprise.iam.core.identity.application.UserAdministrationService.CreateUser(
+                new PersonService.PersonData(r.orgUnitId(), r.employeeId(), r.givenName(), r.familyName(), r.displayName(), null, null,
+                        r.managerPersonId(), com.enterprise.iam.core.identity.domain.Person.EmploymentStatus.ACTIVE, null, null, r.email(),
+                        r.phone()), r.type(), r.username(), r.activate()));
     }
 
     // ---- persons
@@ -100,8 +125,11 @@ class IdentityController {
     @GetMapping("/identities")
     @RequiresPermission(Permissions.IDENTITY_READ)
     PageResult<IdentityView> listIdentities(@RequestParam(required = false) UUID personId, @RequestParam(required = false) IdentityState state,
+                                            @RequestParam(required = false) IdentityType type, @RequestParam(required = false) UUID orgUnitId,
+                                            @RequestParam(required = false) @Size(max = 100) String q,
                                             @RequestParam(required = false) Integer limit, @RequestParam(required = false) String cursor) {
-        return identities.list(actors.require(), personId, state == null ? null : state.name(), PageRequest.of(limit, cursor));
+        return identities.list(actors.require(), new com.enterprise.iam.core.identity.application.IdentityStore.IdentityQuery(personId,
+                state == null ? null : state.name(), type == null ? null : type.name(), orgUnitId, q), PageRequest.of(limit, cursor));
     }
 
     @PostMapping("/identities")
@@ -140,6 +168,21 @@ class IdentityController {
     @RequiresStepUp
     IdentityView disable(@PathVariable UUID id, @Valid @RequestBody ReasonRequest r) {
         return identities.transition(actors.require(), id, IdentityState.DISABLED, r.reason());
+    }
+
+    @PostMapping("/identities/{id}:create-login")
+    @RequiresPermission(Permissions.IDENTITY_PLATFORM_USER)
+    @RequiresStepUp
+    PlatformLoginService.Provisioned createLogin(@PathVariable UUID id) {
+        return logins.provision(actors.require(), id);
+    }
+
+    @PostMapping("/identities/{id}:resend-invitation")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @RequiresPermission(Permissions.IDENTITY_PLATFORM_USER)
+    @RequiresStepUp
+    void resendInvitation(@PathVariable UUID id) {
+        logins.resendInvitation(actors.require(), id);
     }
 
     @PutMapping("/identities/{id}/platform-user")

@@ -10,6 +10,7 @@ import com.enterprise.iam.core.identity.api.IdentityView;
 import com.enterprise.iam.core.identity.api.PersonView;
 import com.enterprise.iam.core.identity.application.ActorResolver;
 import com.enterprise.iam.core.identity.application.IdentityService;
+import com.enterprise.iam.core.identity.application.IdentityStore;
 import com.enterprise.iam.core.identity.application.PersonService;
 import com.enterprise.iam.core.identity.domain.IdentityState;
 import com.enterprise.iam.core.identity.domain.IdentityType;
@@ -92,6 +93,37 @@ class IdentityServicesTest {
         assertTrue(events.stream().allMatch(e -> e instanceof IdentityLifecycleChanged));
         assertEquals(2, events.size());
         assertTrue(audit.stream().anyMatch(e -> e.action().equals("identity.suspended")));
+    }
+
+    @Test
+    void createUserIsOneStepAndRejectsDuplicateUsernamesWithoutOrphans() {
+        var users = new com.enterprise.iam.core.identity.application.UserAdministrationService(persons, identities, store, TestSupport.DIRECT_TX);
+        PersonService.PersonData data = new PersonService.PersonData(null, null, "Heidi", "Klum", null, null, null, null,
+                Person.EmploymentStatus.ACTIVE, null, null, "heidi@example.org", null);
+        IdentityView u = users.create(admin, new com.enterprise.iam.core.identity.application.UserAdministrationService.CreateUser(
+                data, IdentityType.EMPLOYEE, "Heidi.Klum", true));
+        assertEquals("heidi.klum", u.username());
+        assertEquals("ACTIVE", u.state());
+        int before = store.persons.size();
+        assertThrows(IamException.class, () -> users.create(admin, new com.enterprise.iam.core.identity.application.UserAdministrationService.CreateUser(
+                data, IdentityType.EMPLOYEE, "heidi.klum", true)), "duplicate username");
+        assertThrows(IamException.class, () -> users.create(admin, new com.enterprise.iam.core.identity.application.UserAdministrationService.CreateUser(
+                data, IdentityType.EMPLOYEE, "-bad", true)), "invalid username");
+        assertEquals(before, store.persons.size(), "no orphan person");
+    }
+
+    @Test
+    void userListFiltersBySearchStateAndType() {
+        identities.create(admin, person("Frank", null).id(), IdentityType.EMPLOYEE, "frank.miller", null);
+        IdentityView g = identities.create(admin, person("Grace", null).id(), IdentityType.EMPLOYEE, "grace.hopper", null);
+        identities.transition(admin, g.id(), IdentityState.ACTIVE, null);
+        var page = com.enterprise.iam.core.shared.api.paging.PageRequest.of(100, null);
+        assertEquals(List.of("grace.hopper"), identities.list(admin, new IdentityStore.IdentityQuery(null, null, null, null, "HOPP"), page)
+                .items().stream().map(IdentityView::username).toList());
+        assertEquals(List.of("grace.hopper"), identities.list(admin, new IdentityStore.IdentityQuery(null, "ACTIVE", "EMPLOYEE", null, null), page)
+                .items().stream().map(IdentityView::username).filter(u -> u.equals("grace.hopper") || u.equals("frank.miller")).toList());
+        assertTrue(identities.list(admin, new IdentityStore.IdentityQuery(null, null, "CONTRACTOR", null, null), page).items().isEmpty());
+        assertThrows(IamException.class, () -> identities.list(admin, new IdentityStore.IdentityQuery(null, null, null, null, "x".repeat(101)), page));
     }
 
     @Test

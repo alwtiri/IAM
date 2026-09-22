@@ -101,6 +101,12 @@ public class JdbcIdentityStore implements IdentityStore {
     }
 
     @Override
+    public Optional<UUID> activeIdentityOfPerson(UUID personId) {
+        return jdbc.sql("SELECT id FROM identity.identity WHERE person_id = :p AND state = 'ACTIVE' ORDER BY valid_from, id LIMIT 1")
+                .param("p", personId).query(UUID.class).optional();
+    }
+
+    @Override
     public boolean employeeIdExists(String employeeId, UUID exceptPersonId) {
         return jdbc.sql("SELECT count(*) FROM identity.person WHERE employee_id = :emp AND id <> :id")
                 .param("emp", employeeId).param("id", exceptPersonId).query(Long.class).single() > 0;
@@ -193,6 +199,43 @@ public class JdbcIdentityStore implements IdentityStore {
     }
 
     @Override
+    public List<Scoped<Identity>> listIdentities(ScopeFilter filter, IdentityQuery q, PageRequest page) {
+        Map<String, Object> params = new HashMap<>();
+        StringBuilder sql = new StringBuilder(IDENTITY_SELECT).append(" WHERE i.type <> 'SYSTEM' AND ")
+                .append(ScopeSql.predicate(filter, SCOPE, params, "s_"));
+        if (q.personId() != null) {
+            sql.append(" AND i.person_id = :person");
+            params.put("person", q.personId());
+        }
+        if (q.state() != null) {
+            sql.append(" AND i.state = :state");
+            params.put("state", q.state());
+        }
+        if (q.type() != null) {
+            sql.append(" AND i.type = :type");
+            params.put("type", q.type());
+        }
+        if (q.orgUnitId() != null) {
+            sql.append(" AND p.org_unit_id = :ou");
+            params.put("ou", q.orgUnitId());
+        }
+        if (q.search() != null && !q.search().isBlank()) {
+            sql.append(" AND (lower(i.username) LIKE :q ESCAPE '\\' OR lower(p.display_name) LIKE :q ESCAPE '\\' OR lower(coalesce(p.email, '')) LIKE :q ESCAPE '\\')");
+            String s = q.search().trim().toLowerCase(java.util.Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+            params.put("q", "%" + s + "%");
+        }
+        if (page.after() != null) {
+            sql.append(" AND i.id > :after");
+            params.put("after", page.after());
+        }
+        sql.append(" ORDER BY i.id LIMIT :limit");
+        params.put("limit", page.limit() + 1);
+        return jdbc.sql(sql.toString()).params(params)
+                .query((rs, n) -> new Scoped<>(identity(rs), rs.getString("org_path"), rs.getString("display_name"),
+                        rs.getBoolean("has_platform_user"))).list();
+    }
+
+    @Override
     public List<Identity> findExpired(Instant now, int limit) {
         return jdbc.sql("""
                 SELECT * FROM identity.identity WHERE valid_until <= :now AND state IN ('PENDING', 'ACTIVE', 'SUSPENDED')
@@ -233,6 +276,12 @@ public class JdbcIdentityStore implements IdentityStore {
     public boolean hasPlatformUser(UUID identityId) {
         return jdbc.sql("SELECT count(*) FROM identity.platform_user WHERE identity_id = :id").param("id", identityId)
                 .query(Long.class).single() > 0;
+    }
+
+    @Override
+    public Optional<String> subjectOf(UUID identityId) {
+        return jdbc.sql("SELECT keycloak_subject FROM identity.platform_user WHERE identity_id = :id").param("id", identityId)
+                .query(String.class).optional();
     }
 
     @Override

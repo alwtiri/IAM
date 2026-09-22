@@ -44,6 +44,10 @@ public class ProviderRegistryService implements ProviderDirectory {
     public record RegisterCommand(String type, String name, String endpoint, Map<String, String> settings, Secret credential) {
     }
 
+    /** Connection change: new endpoint/settings; a new credential (optional) becomes a new Vault version. */
+    public record UpdateCommand(String endpoint, Map<String, String> settings, Secret credential) {
+    }
+
     public record CapabilityCatalog(String spiVersion, List<String> capabilities, List<String> statuses) {
     }
 
@@ -122,6 +126,57 @@ public class ProviderRegistryService implements ProviderDirectory {
         });
     }
 
+    public ProviderInstanceView update(CurrentActor actor, UUID id, UpdateCommand cmd) {
+        ProviderInstance p = tx.readOnly(() -> store.find(id)).orElseThrow(() -> IamException.notFound("Provider instance"));
+        guard.require(actor, Permissions.PROVIDER_WRITE, scope(p), true);
+        // validate metadata before touching Vault
+        new ProviderInstance(id, p.type(), p.name(), cmd.endpoint(), cmd.settings(), p.credentialSecretRef(), p.enabled(), p.version());
+        SecretRef ref = cmd.credential() == null ? null : secrets.write("providers/" + id + "/connection", cmd.credential());
+        String credentialRef = ref == null ? p.credentialSecretRef() : ref.value();
+        return tx.inTransaction(() -> {
+            ProviderInstance next = new ProviderInstance(id, p.type(), p.name(), cmd.endpoint(), cmd.settings(), credentialRef, p.enabled(),
+                    p.version());
+            if (!store.update(next, p.version())) {
+                throw IamException.concurrentModification("Provider instance");
+            }
+            audit.record(actor, new AuditEntry("provider-instance.updated", "provider-instance", id.toString(), null, AuditEntry.Result.SUCCESS,
+                    null, id, Map.of("credentialChanged", String.valueOf(ref != null))));
+            return store.view(id).orElseThrow();
+        });
+    }
+
+    /** Removes a connection from service: unbinds it from every target and disables it (kept for history and audit). */
+    public void retire(CurrentActor actor, UUID id) {
+        tx.run(() -> {
+            ProviderInstance p = store.find(id).orElseThrow(() -> IamException.notFound("Provider instance"));
+            guard.require(actor, Permissions.PROVIDER_WRITE, scope(p), true);
+            for (UUID target : store.targetsOf(id)) {
+                store.unbind(target, id);
+            }
+            if (p.enabled() && !store.setEnabled(id, false, p.version())) {
+                throw IamException.concurrentModification("Provider instance");
+            }
+            audit.record(actor, new AuditEntry("provider-instance.retired", "provider-instance", id.toString(), null, AuditEntry.Result.SUCCESS,
+                    null, id, Map.of("name", p.name())));
+        });
+    }
+
+    /**
+     * Deletes a server/database from service: decommissions the target and retires the connections that served only it,
+     * in one transaction. Accounts, operations and audit history are kept.
+     */
+    public void deleteTarget(CurrentActor actor, UUID targetId, String reason) {
+        tx.run(() -> {
+            targets.decommission(actor, targetId, reason);
+            for (ProviderBindingView b : store.bindings(targetId)) {
+                store.unbind(targetId, b.providerInstanceId());
+                if (store.targetsOf(b.providerInstanceId()).isEmpty()) {
+                    store.find(b.providerInstanceId()).filter(ProviderInstance::enabled).ifPresent(p -> store.setEnabled(p.id(), false, p.version()));
+                }
+            }
+        });
+    }
+
     public ProviderInstanceView get(CurrentActor actor, UUID id) {
         ProviderInstance p = tx.readOnly(() -> store.find(id)).orElseThrow(() -> IamException.notFound("Provider instance"));
         guard.require(actor, Permissions.PROVIDER_READ, scope(p), true);
@@ -186,6 +241,11 @@ public class ProviderRegistryService implements ProviderDirectory {
     public Optional<Connection> connection(UUID providerInstanceId) {
         return store.find(providerInstanceId).map(p -> new Connection(p.id(), p.type().value(), p.endpoint(), p.settings(),
                 p.credentialSecretRef(), p.enabled()));
+    }
+
+    @Override
+    public List<ProviderBindingView> allBindings() {
+        return tx.readOnly(store::allBindings);
     }
 
     @Override

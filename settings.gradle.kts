@@ -29,4 +29,5 @@ listOf(
     "providers:active-directory",
     "providers:generic-rest",
     "providers:windows-winrm",
+    "providers:postgresql",
 ).filter { file(it.replace(':', '/')).isDirectory }.forEach { include(it) }

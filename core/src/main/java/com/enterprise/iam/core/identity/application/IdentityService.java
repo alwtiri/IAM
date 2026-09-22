@@ -129,13 +129,21 @@ public class IdentityService implements IdentityDirectory {
     public IdentityView get(CurrentActor actor, UUID id) {
         IdentityStore.Scoped<Identity> i = tx.readOnly(() -> store.findIdentity(id)).orElseThrow(() -> IamException.notFound("Identity"));
         guard.require(actor, Permissions.IDENTITY_READ, PersonService.scopeFromPath(i.orgUnitPath()), true);
-        return view(i.value(), i.displayName(), i.platformUser());
+        return view(i.value(), i.displayName(), i.platformUser(), i.orgUnitPath());
     }
 
     public PageResult<IdentityView> list(CurrentActor actor, UUID personId, String state, PageRequest page) {
+        return list(actor, new IdentityStore.IdentityQuery(personId, state, null, null, null), page);
+    }
+
+    /** User list with search and filters; results are limited to the actor's identity:read scope. */
+    public PageResult<IdentityView> list(CurrentActor actor, IdentityStore.IdentityQuery query, PageRequest page) {
+        if (query.search() != null && query.search().length() > 100) {
+            throw IamException.validation("q", "TOO_LONG", "search text is limited to 100 characters");
+        }
         var filter = guard.filter(actor, Permissions.IDENTITY_READ);
-        return tx.readOnly(() -> PageResult.fromOverfetch(store.listIdentities(filter, personId, state, page), page.limit(),
-                s -> s.value().id())).map(s -> view(s.value(), s.displayName(), s.platformUser()));
+        return tx.readOnly(() -> PageResult.fromOverfetch(store.listIdentities(filter, query, page), page.limit(),
+                s -> s.value().id())).map(s -> view(s.value(), s.displayName(), s.platformUser(), s.orgUnitPath()));
     }
 
     @Override
@@ -148,8 +156,19 @@ public class IdentityService implements IdentityDirectory {
         return username == null || username.isBlank() ? Optional.empty() : store.identityIdByUsername(username).flatMap(store::summary);
     }
 
+    @Override
+    public Optional<UUID> managerIdentityOf(UUID identityId) {
+        return tx.readOnly(() -> store.findIdentity(identityId)
+                .flatMap(i -> store.managerOf(i.value().personId()))
+                .flatMap(store::activeIdentityOfPerson));
+    }
+
     static IdentityView view(Identity i, String displayName, boolean platformUser) {
+        return view(i, displayName, platformUser, null);
+    }
+
+    static IdentityView view(Identity i, String displayName, boolean platformUser, String orgUnitPath) {
         return new IdentityView(i.id(), i.personId(), displayName, i.type().name(), i.username(), i.state().name(), i.stateReason(),
-                i.validFrom(), i.validUntil(), platformUser, i.version());
+                i.validFrom(), i.validUntil(), platformUser, i.version(), orgUnitPath);
     }
 }

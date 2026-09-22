@@ -19,4 +19,12 @@ class AuditConfiguration {
     AuditService auditService(JdbcClient jdbc, RequestContextProvider ctx, @Lazy AccessGuard guard, TransactionRunner tx, Clock clock) {
         return new AuditService(new JdbcAuditStore(jdbc), ctx, guard, tx, clock);
     }
+
+    /** Audit forwarding to a SIEM webhook; idle unless {@code iam.siem.webhook-url} is set. */
+    @Bean
+    com.enterprise.iam.core.audit.infrastructure.siem.SiemForwarder siemForwarder(JdbcClient jdbc,
+            @org.springframework.beans.factory.annotation.Value("${iam.siem.webhook-url:}") String url,
+            @org.springframework.beans.factory.annotation.Value("${iam.siem.webhook-secret:}") String secret) {
+        return new com.enterprise.iam.core.audit.infrastructure.siem.SiemForwarder(jdbc, url == null || url.isBlank() ? null : java.net.URI.create(url.trim()), secret);
+    }
 }

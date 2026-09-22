@@ -11,6 +11,7 @@ import com.enterprise.iam.provider.spi.model.AccountRef;
 import com.enterprise.iam.provider.spi.model.AccountState;
 import com.enterprise.iam.provider.spi.model.ConnectionReport;
 import com.enterprise.iam.provider.spi.model.Page;
+import com.enterprise.iam.provider.spi.model.PasswordChange;
 import com.enterprise.iam.provider.spi.result.OperationOutcome;
 import com.enterprise.iam.provider.spi.result.OperationResult;
 import com.enterprise.iam.provider.spi.result.ProviderError;
@@ -191,6 +192,13 @@ public final class OperationExecutor {
                 case ENABLE_ACCOUNT -> single(provider.enableAccount(ctx, account(c)), s -> Map.of("state", AccountJson.state(s)));
                 case DISABLE_ACCOUNT -> single(provider.disableAccount(ctx, account(c)), s -> Map.of("state", AccountJson.state(s)));
                 case UNLOCK_ACCOUNT -> single(provider.unlockAccount(ctx, account(c)), s -> Map.of("state", AccountJson.state(s)));
+                case ROTATE_PASSWORD -> {
+                    String newSecret = c.credentialHandles().get("new-secret");
+                    if (newSecret == null) {
+                        yield Outcome.of(error("CONFIGURATION_INVALID", "rotation command without a new secret handle", false, false));
+                    }
+                    yield single(provider.rotatePassword(ctx, new PasswordChange(account(c), null, new CredentialHandle(newSecret))), v -> Map.of());
+                }
                 default -> new Outcome("UNSUPPORTED", null, error(OperationResult.UNSUPPORTED_CAPABILITY,
                         "operation " + op + " is not executed by the Phase 3 worker", false, false), null);
             };

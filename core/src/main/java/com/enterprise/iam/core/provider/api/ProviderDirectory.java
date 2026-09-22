@@ -16,4 +16,9 @@ public interface ProviderDirectory {
     Optional<Connection> connection(UUID providerInstanceId);
 
     boolean isBound(UUID targetId, UUID providerInstanceId);
+
+    /** All target bindings (scheduled discovery). */
+    default java.util.List<ProviderBindingView> allBindings() {
+        return java.util.List.of();
+    }
 }

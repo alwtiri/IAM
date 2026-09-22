@@ -92,12 +92,31 @@ public class JdbcAuditStore implements AuditStore {
             params.put("actor", f.actorIdentityId());
         }
         if (f.action() != null) {
-            sql.append(" AND action = :action");
-            params.put("action", f.action());
+            // comma-separated list of exact actions or prefixes ending in '*' (e.g. "credential.*,auth.access.denied")
+            List<String> ors = new java.util.ArrayList<>();
+            int i = 0;
+            for (String part : f.action().split(",")) {
+                String a = part.trim();
+                if (a.isEmpty() || i >= 20) {
+                    continue;
+                }
+                String key = "action" + i++;
+                if (a.endsWith("*")) {
+                    ors.add("action LIKE :" + key);
+                    params.put(key, a.substring(0, a.length() - 1).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%");
+                } else {
+                    ors.add("action = :" + key);
+                    params.put(key, a);
+                }
+            }
+            if (!ors.isEmpty()) {
+                sql.append(" AND (").append(String.join(" OR ", ors)).append(")");
+            }
         }
         if (f.objectType() != null) {
-            sql.append(" AND object_type = :objectType");
-            params.put("objectType", f.objectType());
+            List<String> types = java.util.Arrays.stream(f.objectType().split(",")).map(String::trim).filter(x -> !x.isEmpty()).limit(20).toList();
+            sql.append(" AND object_type IN (:objectTypes)");
+            params.put("objectTypes", types.isEmpty() ? List.of("") : types);
         }
         if (f.objectId() != null) {
             sql.append(" AND object_id = :objectId");

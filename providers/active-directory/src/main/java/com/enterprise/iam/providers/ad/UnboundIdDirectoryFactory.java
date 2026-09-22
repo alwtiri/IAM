@@ -215,6 +215,15 @@ final class UnboundIdDirectoryFactory implements LdapDirectoryFactory {
         }
 
         @Override
+        public void replaceBinary(String dn, String attribute, byte[] value) throws IOException {
+            try {
+                conn.modify(dn, new Modification(ModificationType.REPLACE, attribute, value));
+            } catch (LDAPException e) {
+                throw failure(e, true);
+            }
+        }
+
+        @Override
         public void close() {
             conn.close();
         }

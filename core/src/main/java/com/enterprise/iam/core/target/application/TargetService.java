@@ -93,6 +93,28 @@ public class TargetService implements TargetDirectory {
     }
 
     @Override
+    public void decommission(CurrentActor actor, UUID id, String reason) {
+        tx.run(() -> {
+            TargetStore.Scoped cur = store.find(id).orElseThrow(() -> IamException.notFound("Target"));
+            guard.require(actor, Permissions.TARGET_WRITE, scope(cur), true);
+            Target t = cur.target();
+            if (t.status() == Target.Status.DECOMMISSIONED) {
+                return;
+            }
+            String suffix = " [deleted " + java.time.LocalDate.now(clock) + " " + id.toString().substring(0, 8) + "]";
+            String base = t.name().length() + suffix.length() > 200 ? t.name().substring(0, 200 - suffix.length()) : t.name();
+            Target next = new Target(id, base + suffix, t.hostname(), t.ipAddress(), t.dnsName(), t.type(), t.platform(), t.operatingSystem(),
+                    t.environment(), t.criticality(), t.classification(), t.ownerOrgUnitId(), t.ownerIdentityId(), t.technicalOwnerIdentityId(),
+                    t.businessOwnerIdentityId(), t.locationId(), t.tags(), Target.Status.DECOMMISSIONED, t.version());
+            if (!store.update(next, t.version())) {
+                throw IamException.concurrentModification("Target");
+            }
+            audit.record(actor, new AuditEntry("target.decommissioned", "target", id.toString(), id, AuditEntry.Result.SUCCESS, reason, null,
+                    Map.of("name", t.name(), "type", t.type().name())));
+        });
+    }
+
+    @Override
     public Optional<ResourceScope> scopeOf(UUID targetId) {
         return store.find(targetId).map(TargetService::scope);
     }

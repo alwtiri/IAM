@@ -31,6 +31,9 @@ public final class MinaSshTransportFactory implements SshTransportFactory {
     /** Expected host-key fingerprint, passed per connection so it is known during key exchange ("*" = lab: any key). */
     static final AttributeRepository.AttributeKey<String> EXPECTED_HOST_KEY = new AttributeRepository.AttributeKey<>();
 
+    /** Key type and fingerprint the server actually presented when it did not match (for an actionable error message). */
+    static final AttributeRepository.AttributeKey<String> PRESENTED_HOST_KEY = new AttributeRepository.AttributeKey<>();
+
     private static final SshClient CLIENT = startClient();
 
     private static SshClient startClient() {
@@ -38,7 +41,12 @@ public final class MinaSshTransportFactory implements SshTransportFactory {
         client.setServerKeyVerifier((session, remote, serverKey) -> {
             AttributeRepository ctx = session.getConnectionContext();
             String expected = ctx == null ? null : ctx.getAttribute(EXPECTED_HOST_KEY);
-            return expected != null && ("*".equals(expected) || expected.equals(KeyUtils.getFingerPrint(BuiltinDigests.sha256, serverKey)));
+            String actual = KeyUtils.getFingerPrint(BuiltinDigests.sha256, serverKey);
+            boolean ok = expected != null && ("*".equals(expected) || expected.equals(actual));
+            if (!ok) {
+                session.setAttribute(PRESENTED_HOST_KEY, KeyUtils.getKeyType(serverKey) + " " + actual);
+            }
+            return ok;
         });
         client.start();
         return client;
@@ -81,7 +89,10 @@ public final class MinaSshTransportFactory implements SshTransportFactory {
             try {
                 session.auth().verify(timeout);
             } catch (IOException e) {
-                throw new SshTransport.AuthenticationException("authentication or host key verification failed for " + username + "@" + host);
+                String presented = session.getAttribute(PRESENTED_HOST_KEY);
+                throw new SshTransport.AuthenticationException(presented != null
+                        ? "host key verification failed for " + host + ": server presented " + presented + ", expected " + hostKeyFingerprint
+                        : "authentication failed for " + username + "@" + host);
             }
             return new MinaTransport(session);
         } catch (IOException | RuntimeException e) {

@@ -52,6 +52,8 @@ public class AccountOperationService {
     private static final Duration DISCOVERY_TIMEOUT = Duration.ofMinutes(30);
     private static final Duration LIFECYCLE_TIMEOUT = Duration.ofMinutes(2);
     private static final Duration HANDLE_TTL = Duration.ofMinutes(10);
+    private static final Duration TEST_TIMEOUT = Duration.ofMinutes(1);
+    private static final Duration TEST_HANDLE_TTL = Duration.ofMinutes(2);
 
     private final AccountService accounts;
     private final AccountStore store;
@@ -99,6 +101,56 @@ public class AccountOperationService {
                     AuditEntry.Result.SUCCESS, null, providerInstanceId, Map.of("operation", opId.toString(), "run", runId.toString())));
             return new Submitted(opId, runId);
         });
+    }
+
+    /** Connection test of a provider instance bound to a target (VALIDATE_CONNECTION; read-only, result on the operation). */
+    public Submitted requestConnectionTest(CurrentActor actor, UUID targetId, UUID providerInstanceId) {
+        return tx.inTransaction(() -> {
+            ProviderDirectory.Connection c = connection(providerInstanceId);
+            ResourceScope targetScope = targets.scopeOf(targetId).orElseThrow(() -> IamException.notFound("Target"));
+            ResourceScope scope = new ResourceScope(targetScope.orgUnitPath(), targetScope.environment(), c.type(), c.id(), targetId);
+            guard.require(actor, Permissions.ACCOUNT_DISCOVER, scope, true);
+            if (!providers.isBound(targetId, providerInstanceId)) {
+                throw IamException.validation("providerInstanceId", "NOT_BOUND", "bind the provider instance to the target first");
+            }
+            ProviderCommand cmd = new ProviderCommand("VALIDATE_CONNECTION", false, c.type(), c.id(), targetId, null, actor.identityId(),
+                    targetScope.orgUnitPath(), targetScope.environment(), Map.of("connection", connectionPayload(c)), TEST_TIMEOUT, 1,
+                    "validate:" + targetId + ":" + providerInstanceId + ":" + UUID.randomUUID());
+            UUID opId = operations.create(cmd);
+            operations.dispatch(opId, cmd, handles.issue(opId, c.type(), Map.of("connection", new SecretRef(c.credentialSecretRef())), TEST_HANDLE_TTL));
+            audit.record(actor, new AuditEntry("target.connection-test-requested", "target", targetId.toString(), targetId,
+                    AuditEntry.Result.SUCCESS, null, providerInstanceId, Map.of("operation", opId.toString())));
+            return new Submitted(opId, null);
+        });
+    }
+
+    /**
+     * Scheduled discovery (Phase 8 increment): starts a read-only discovery for every enabled binding whose last run is older
+     * than {@code interval} and that has no run in progress. Runs as the SYSTEM identity; failures of one binding never stop others.
+     *
+     * @return number of discoveries started
+     */
+    public int scheduleDiscoveries(Duration interval) {
+        CurrentActor system = CurrentActor.system(com.enterprise.iam.core.shared.api.security.SystemIdentities.SYSTEM_IDENTITY_ID);
+        java.time.Instant cutoff = java.time.Instant.now().minus(interval);
+        int started = 0;
+        for (var b : providers.allBindings()) {
+            try {
+                var runs = tx.readOnly(() -> store.runs(b.targetId(), 50)).stream()
+                        .filter(r -> r.providerInstanceId().equals(b.providerInstanceId())).toList();
+                boolean running = runs.stream().anyMatch(r -> "RUNNING".equals(r.status()) && r.startedAt().isAfter(cutoff));
+                boolean recent = runs.stream().anyMatch(r -> r.startedAt().isAfter(cutoff));
+                var c = providers.connection(b.providerInstanceId());
+                if (running || recent || c.isEmpty() || !c.get().enabled() || c.get().credentialSecretRef() == null) {
+                    continue;
+                }
+                requestDiscovery(system, b.targetId(), b.providerInstanceId());
+                started++;
+            } catch (RuntimeException e) {
+                // next binding; the failure is visible as a missing or failed run
+            }
+        }
+        return started;
     }
 
     public Submitted requestLifecycle(CurrentActor actor, UUID accountId, Action action, String reason) {

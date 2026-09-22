@@ -36,4 +36,10 @@ public interface AuthorizationStore {
     long countEffectiveGlobal(UUID roleId, Instant now);
 
     List<RoleAssignment> findExpired(Instant now, int limit);
+
+    /** Role codes effectively held by an ACTIVE identity at {@code now}. */
+    List<String> activeRoleCodes(UUID identityId, Instant now);
+
+    /** ACTIVE identities effectively holding the role at {@code now}. */
+    List<UUID> activeHolders(String roleCode, Instant now);
 }

@@ -51,6 +51,8 @@ class ActiveDirectoryProviderTest {
             String lockoutTime = "0";
             String accountExpires = "9223372036854775807";
             String adminCount;
+            String password;
+            long pwdLastSet = 133000000000000000L;
             List<String> memberOf = new ArrayList<>();
 
             User(String sam, String ou) {
@@ -159,6 +161,15 @@ class ActiveDirectoryProviderTest {
                 }
 
                 @Override
+                public void replaceBinary(String dn, String attribute, byte[] value) {
+                    modifications.add(dn + " " + attribute + "=<binary>");
+                    User u = users.values().stream().filter(x -> x.dn.equals(dn)).findFirst().orElseThrow();
+                    String quoted = new String(value, java.nio.charset.StandardCharsets.UTF_16LE);
+                    u.password = quoted.substring(1, quoted.length() - 1);
+                    u.pwdLastSet++;
+                }
+
+                @Override
                 public void close() {
                 }
             };
@@ -173,6 +184,7 @@ class ActiveDirectoryProviderTest {
             v.put("accountExpires", List.of(u.accountExpires));
             v.put("lastLogonTimestamp", List.of(fileTime(NOW.minusSeconds(86_400))));
             v.put("memberOf", u.memberOf);
+            v.put("pwdLastSet", List.of(String.valueOf(u.pwdLastSet)));
             if (u.adminCount != null) {
                 v.put("adminCount", List.of(u.adminCount));
             }
@@ -291,6 +303,18 @@ class ActiveDirectoryProviderTest {
         int before = dir.modifications.size();
         assertEquals("PROTECTED_ACCOUNT", provider.enableAccount(ctx(), new AccountRef(null, "krbtgt")).error().orElseThrow().code());
         assertEquals(before, dir.modifications.size());
+    }
+
+    @Test
+    void rotationWritesUnicodePwdAndVerifiesPwdLastSet() {
+        OperationContext ctx = new OperationContext(UUID.randomUUID(), "key-12345678", "corr-12345678", 1, NOW.plusSeconds(60),
+                h -> Secret.of(h.value().equals("ch_new") ? "Vault-Gen3rated!" : "s3cret"));
+        var r = provider.rotatePassword(ctx, new com.enterprise.iam.provider.spi.model.PasswordChange(new AccountRef(null, "svc-sql"), null,
+                new CredentialHandle("ch_new")));
+        assertEquals(OperationOutcome.SUCCEEDED, r.outcome(), r.toString());
+        assertEquals("Vault-Gen3rated!", dir.users.get("svc-sql").password);
+        assertEquals("PROTECTED_ACCOUNT", provider.rotatePassword(ctx, new com.enterprise.iam.provider.spi.model.PasswordChange(
+                new AccountRef(null, "krbtgt"), null, new CredentialHandle("ch_new"))).error().orElseThrow().code());
     }
 
     @Test
