@@ -1,6 +1,6 @@
 # Project status: what works, what is partial, what remains
 
-Last updated: 2026-09-22 (Phase 3). "Works in the UI" means an administrator can do it end to end in the web app without
+Last updated: 2026-09-22 (Phase 6.1). "Works in the UI" means an administrator can do it end to end in the web app without
 curl. Everything below is also available through the REST API.
 
 ## Works in the UI (after applying the latest bundle and running update-stack.sh)
@@ -15,6 +15,9 @@ curl. Everything below is also available through the REST API.
 | Policies and SoD | View access policies (deny overrides allow), enable/disable them; view separation-of-duties rules | Identity & Access → Access Policies |
 | Windows servers | WinRM (HTTPS) connection, discovery of local accounts, verified disable/enable/unlock | Assets → Servers |
 | Databases (PostgreSQL) | Add a database, connect with TLS (password in Vault), test, discover login roles, see superusers and privileged memberships, disable/enable logins with read-back | Assets → Databases |
+| Password vault (PAM) | "Vault" a privileged account: the platform sets a random 24-character password it alone knows (Linux, Windows, AD, PostgreSQL), promotes it only after the target confirmed it, rotates every 30 days, and shows VERIFIED / UNKNOWN / FAILED honestly | Accounts → Privileged Accounts → Vault; Privileged Access → Password Vault |
+| Credential checkout | Request a password for 1–72 h with a justification (policy P-300: PAM administrator approves); or check out directly as a credential manager (MFA + reason); show the password (MFA, audited, hidden after 60 s); check in → the password is changed automatically; overdue checkouts end automatically | Privileged Access → Credential Requests / My Checkouts / Approvals |
+| Look & feel | shadcn/ui-style design, light and dark mode, Arabic RTL | Header: moon/sun button, العربية |
 | Reports | CSV exports: accounts, privileged accounts, open findings, access requests, users, audit trail | Reports |
 | Scheduled discovery | Every bound server/database is re-discovered daily (configurable `iam.discovery.interval`) | Automatic |
 | Notifications | E-mail to approvers when a request waits for them and to requesters on the outcome | Mailpit in development |
@@ -37,7 +40,7 @@ curl. Everything below is also available through the REST API.
 |---|---|
 | 4 (remaining) | Policy authoring UI, access reviews, joiner/mover/leaver, on-behalf and server-account requests |
 | 5 (remaining) | More providers: MySQL/Oracle/SQL Server, network devices, virtualization, storage |
-| 6 | PAM: privileged sessions, SSH/RDP gateways, recording, emergency access |
+| 6 (remaining) | Privileged sessions through SSH/RDP gateways with recording, emergency (break-glass) accounts |
 | 7 (remaining) | Scheduled/emailed reports, access logs, configuration history, settings |
 | 8 (remaining) | Drift detection and reconciliation, SIEM/ITSM/HR integrations |
 | 9 | Security hardening: image gate back on, SBOM, signing, production settings |
