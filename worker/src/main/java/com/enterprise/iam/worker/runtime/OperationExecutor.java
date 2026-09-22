@@ -175,7 +175,13 @@ public final class OperationExecutor {
         String connectionHandle = c.credentialHandles().get("connection");
         ProviderConnection connection = new ProviderConnection(c.providerInstanceId(), ProviderTypeId.of(c.providerType()), c.endpoint(),
                 c.settings(), connectionHandle == null ? null : new CredentialHandle(connectionHandle));
-        Provider provider = factory.create(connection);
+        Provider provider;
+        try {
+            provider = factory.create(connection);
+        } catch (IllegalArgumentException e) {
+            // Configuration problems are reported with the provider's own (non-secret) explanation.
+            return Outcome.of(error("CONFIGURATION_INVALID", "provider instance configuration rejected: " + e.getMessage(), false, false));
+        }
         OperationContext ctx = new OperationContext(c.operationId(), c.idempotencyKey(), c.correlationId(), c.attempt(), c.deadline(), creds);
         try {
             return switch (op) {

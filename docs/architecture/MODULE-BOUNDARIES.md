@@ -15,7 +15,7 @@
 | `provider-spi-testkit` | test library (JUnit 5) | `provider-spi` | core |
 | `core` | Spring Boot application `iam-core` | `shared-kernel`, `provider-spi` (types only: capability model, result types) | `providers/*`, `gateways/*`, `worker`, `agent`, `integrations/*` |
 | `worker` (Phase 3) | Spring Boot application | `shared-kernel`, `provider-spi`, `providers/*` (runtime classpath) | `core` internals |
-| `providers/<type>` (Phase 3+) | plain Java libraries | `provider-spi` | `core`, other providers |
+| `providers/<type>` (Phase 3+) | plain Java libraries | `provider-spi`, `shared-kernel`, their protocol library (ADR-0018) | `core`, `worker`, other providers, Spring |
 | `gateways/<channel>` (Phase 6) | applications | `shared-kernel`, generated internal API client | `core` internals |
 
 ## 2. `core` application modules

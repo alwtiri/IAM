@@ -14,7 +14,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webmvc") // health/metrics endpoint only
     implementation("org.springframework.boot:spring-boot-starter-amqp")
 
-    // Provider plugins are loaded with ServiceLoader from the runtime classpath (added per increment 3.4–3.7).
+    // Provider plugins are loaded with ServiceLoader from the runtime classpath.
+    runtimeOnly(project(":providers:generic-rest"))
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
