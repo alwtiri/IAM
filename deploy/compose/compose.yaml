@@ -128,7 +128,7 @@ services:
     user: "10001:10001"
     environment:
       # Provider types served by this worker (one queue each, G4). Split into several workers per pool in production.
-      IAM_WORKER_POOLS: linux-ssh,active-directory,windows-winrm,generic-rest
+      IAM_WORKER_POOLS: linux-ssh,active-directory,windows-winrm,generic-rest,postgresql
       IAM_CORE_INTERNAL_URL: https://iam-core:8443
     secrets:
       - source: rabbitmq_password

@@ -10,13 +10,16 @@ import { useLocale } from '../i18n/LocaleContext';
 import { AccountsTable, OperationOutcome } from './Accounts';
 import { DataTable, ErrorAlert } from './common';
 
-const SERVER_TYPES = ['LINUX_SERVER', 'WINDOWS_SERVER'] as const;
+const SERVER_TYPES: readonly string[] = ['LINUX_SERVER', 'WINDOWS_SERVER'];
+const DATABASE_TYPES: readonly string[] = ['DATABASE'];
 const ENVIRONMENTS = ['PRODUCTION', 'STAGING', 'TEST', 'DEVELOPMENT', 'DR'];
 const CRITICALITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
 /** Server management (Phase 3): register servers, connect them through a provider, test, discover and manage accounts. */
-export function ServersPage() {
+export function ServersPage({ kind = 'servers' }: { kind?: 'servers' | 'databases' }) {
   const { t } = useLocale();
+  const types: readonly string[] = kind === 'databases' ? DATABASE_TYPES : SERVER_TYPES;
+  const title = kind === 'databases' ? t.nav.databases : t.nav.servers;
   const [servers, setServers] = useState<Target[]>();
   const [error, setError] = useState<unknown>();
   const [adding, setAdding] = useState(false);
@@ -24,13 +27,13 @@ export function ServersPage() {
 
   const load = useCallback(async () => {
     try {
-      const pages = await Promise.all(SERVER_TYPES.map((type) => apiFetch<Page<Target>>(`/api/v1/targets?type=${type}&limit=100`)));
+      const pages = await Promise.all(types.map((type) => apiFetch<Page<Target>>(`/api/v1/targets?type=${type}&limit=100`)));
       setServers(pages.flatMap((p) => p.items).sort((a, b) => a.name.localeCompare(b.name)));
       setError(undefined);
     } catch (e) {
       setError(e);
     }
-  }, []);
+  }, [types]);
 
   useEffect(() => {
     void load();
@@ -44,28 +47,32 @@ export function ServersPage() {
   return (
     <Stack spacing={2}>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
-        <Typography variant="h5" component="h2">{t.nav.servers}</Typography>
-        <Button variant="contained" onClick={() => setAdding(true)}>{t.addServer}</Button>
+        <Typography variant="h5" component="h2">{title}</Typography>
+        <Button variant="contained" onClick={() => setAdding(true)}>{kind === 'databases' ? t.addDatabase : t.addServer}</Button>
       </Stack>
       {servers.length === 0 ? <Alert severity="info">{t.noServers}</Alert> : (
         <DataTable<Target> title="" rows={servers} rowKey={(s) => s.id} columns={[
           { header: t.name, cell: (s) => <Button size="small" onClick={() => setSelected(s)}>{s.name}</Button> },
           { header: t.hostname, cell: (s) => s.hostname ?? '' },
-          { header: t.type, cell: (s) => (s.type === 'LINUX_SERVER' ? t.linuxServer : t.windowsServer) },
+          { header: t.type, cell: (s) => typeLabel(t, s.type) },
           { header: t.environment, cell: (s) => s.environment },
           { header: t.criticality, cell: (s) => s.criticality },
           { header: t.state, cell: (s) => s.status },
         ]} />
       )}
-      {adding && <AddServerDialog onClose={() => setAdding(false)} onCreated={(s) => { setAdding(false); void load(); setSelected(s); }} />}
+      {adding && <AddServerDialog types={types} onClose={() => setAdding(false)} onCreated={(s) => { setAdding(false); void load(); setSelected(s); }} />}
     </Stack>
   );
 }
 
-function AddServerDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (t: Target) => void }) {
+function typeLabel(t: ReturnType<typeof useLocale>['t'], type: string) {
+  return type === 'LINUX_SERVER' ? t.linuxServer : type === 'WINDOWS_SERVER' ? t.windowsServer : type === 'DATABASE' ? t.postgresDatabase : type;
+}
+
+function AddServerDialog({ types, onClose, onCreated }: { types: readonly string[]; onClose: () => void; onCreated: (t: Target) => void }) {
   const { t } = useLocale();
   const [units, setUnits] = useState<OrgUnit[]>([]);
-  const [form, setForm] = useState({ name: '', hostname: '', type: 'LINUX_SERVER', environment: 'PRODUCTION', criticality: 'MEDIUM', ownerOrgUnitId: '' });
+  const [form, setForm] = useState({ name: '', hostname: '', type: types[0] ?? 'LINUX_SERVER', environment: 'PRODUCTION', criticality: 'MEDIUM', ownerOrgUnitId: '' });
   const [error, setError] = useState<unknown>();
   const [saving, setSaving] = useState(false);
 
@@ -82,7 +89,9 @@ function AddServerDialog({ onClose, onCreated }: { onClose: () => void; onCreate
     try {
       const created = await apiFetch<Target>('/api/v1/targets', {
         method: 'POST',
-        body: JSON.stringify({ ...form, hostname: form.hostname || null, operatingSystem: form.type === 'LINUX_SERVER' ? 'Linux' : 'Windows' }),
+        body: JSON.stringify({ ...form, hostname: form.hostname || null,
+          operatingSystem: form.type === 'LINUX_SERVER' ? 'Linux' : form.type === 'WINDOWS_SERVER' ? 'Windows' : null,
+          platform: form.type === 'DATABASE' ? 'PostgreSQL' : null }),
       });
       onCreated(created);
     } catch (e) {
@@ -101,8 +110,7 @@ function AddServerDialog({ onClose, onCreated }: { onClose: () => void; onCreate
           <TextField required label={t.name} value={form.name} onChange={set('name')} />
           <TextField required label={t.hostname} value={form.hostname} onChange={set('hostname')} placeholder="srv01.example.org" />
           <TextField select label={t.serverType} value={form.type} onChange={set('type')}>
-            <MenuItem value="LINUX_SERVER">{t.linuxServer}</MenuItem>
-            <MenuItem value="WINDOWS_SERVER">{t.windowsServer}</MenuItem>
+            {types.map((x) => <MenuItem key={x} value={x}>{typeLabel(t, x)}</MenuItem>)}
           </TextField>
           <TextField select label={t.environment} value={form.environment} onChange={set('environment')}>
             {ENVIRONMENTS.map((e) => <MenuItem key={e} value={e}>{e}</MenuItem>)}
@@ -173,7 +181,7 @@ function ServerDetail({ server, onBack }: { server: Target; onBack: () => void }
         <Button onClick={onBack}>← {t.back}</Button>
         <Typography variant="h5" component="h2">{server.name}</Typography>
         <Typography color="text.secondary">
-          {server.hostname} · {server.type === 'LINUX_SERVER' ? t.linuxServer : t.windowsServer} · {server.environment} · {server.criticality}
+          {server.hostname} · {typeLabel(t, server.type)} · {server.environment} · {server.criticality}
         </Typography>
       </Box>
       {error !== undefined && <ErrorAlert error={error} />}
@@ -228,6 +236,9 @@ function ConnectDialog({ server, onClose, onConnected }: { server: Target; onClo
   const [error, setError] = useState<unknown>();
   const [saving, setSaving] = useState(false);
 
+  if (server.type === 'DATABASE') {
+    return <PostgresConnectDialog server={server} onClose={onClose} onConnected={onConnected} />;
+  }
   if (server.type !== 'LINUX_SERVER') {
     return <WinRmConnectDialog server={server} onClose={onClose} onConnected={onConnected} />;
   }
@@ -332,4 +343,63 @@ function WinRmConnectDialog({ server, onClose, onConnected }: { server: Target; 
       </DialogActions>
     </Dialog>
   );
+}
+
+/** PostgreSQL connection (TLS verified by default); the password goes straight to Vault. */
+function PostgresConnectDialog({ server, onClose, onConnected }: { server: Target; onClose: () => void; onConnected: () => void }) {
+  const { t } = useLocale();
+  const [form, setForm] = useState({ host: server.hostname ?? '', port: '5432', database: 'postgres', username: 'iam_service', secret: '',
+    sslMode: 'verify-full', caCertificatePem: '' });
+  const [error, setError] = useState<unknown>();
+  const [saving, setSaving] = useState(false);
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
+  const save = async () => {
+    setSaving(true);
+    try {
+      const settings: Record<string, string> = { username: form.username, sslMode: form.sslMode };
+      if (form.caCertificatePem.trim()) settings.caCertificatePem = form.caCertificatePem.trim();
+      const instance = await apiFetch<ProviderInstance>('/api/v1/provider-instances', {
+        method: 'POST',
+        body: JSON.stringify({ type: 'postgresql', name: `${server.name}-pg`, endpoint: `postgresql://${form.host}:${form.port}/${form.database}`, settings, credential: form.secret }),
+      });
+      await apiFetch(`/api/v1/targets/${server.id}/provider-bindings`, { method: 'POST', body: JSON.stringify({ providerInstanceId: instance.id }) });
+      onConnected();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{t.addConnection} — PostgreSQL</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          {error !== undefined && <ErrorAlert error={error} />}
+          <Alert severity="info">{t.pgHint}</Alert>
+          <Stack direction="row" spacing={2}>
+            <TextField required fullWidth label={t.hostname} value={form.host} onChange={set('host')} />
+            <TextField label={t.port} value={form.port} onChange={set('port')} sx={{ width: 120 }} />
+          </Stack>
+          <TextField label={t.databaseName} value={form.database} onChange={set('database')} />
+          <TextField required label={t.serviceAccount} value={form.username} onChange={set('username')} />
+          <TextField required label={t.password} type="password" value={form.secret} onChange={set('secret')} autoComplete="off" />
+          <TextField select label="TLS" value={form.sslMode} onChange={set('sslMode')}>
+            <MenuItem value="verify-full">verify-full</MenuItem>
+            <MenuItem value="verify-ca">verify-ca</MenuItem>
+            <MenuItem value="require">require</MenuItem>
+          </TextField>
+          <TextField label={t.caCertificate} value={form.caCertificatePem} onChange={set('caCertificatePem')} multiline minRows={3} />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{t.cancel}</Button>
+        <Button variant="contained" disabled={saving || !form.host || !form.username || !form.secret} onClick={() => void save()}>{t.save}</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+export function DatabasesPage() {
+  return <ServersPage kind="databases" />;
 }

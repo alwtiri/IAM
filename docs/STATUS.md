@@ -14,6 +14,10 @@ curl. Everything below is also available through the REST API.
 | Access requests and approvals | Request a role for a period with justification; see which approvals the policy needs; managers and security administrators approve (MFA) or reject with a reason; access is granted automatically and ends automatically | Identity & Access → Access Requests / Approvals |
 | Policies and SoD | View access policies (deny overrides allow), enable/disable them; view separation-of-duties rules | Identity & Access → Access Policies |
 | Windows servers | WinRM (HTTPS) connection, discovery of local accounts, verified disable/enable/unlock | Assets → Servers |
+| Databases (PostgreSQL) | Add a database, connect with TLS (password in Vault), test, discover login roles, see superusers and privileged memberships, disable/enable logins with read-back | Assets → Databases |
+| Reports | CSV exports: accounts, privileged accounts, open findings, access requests, users, audit trail | Reports |
+| Scheduled discovery | Every bound server/database is re-discovered daily (configurable `iam.discovery.interval`) | Automatic |
+| Notifications | E-mail to approvers when a request waits for them and to requesters on the outcome | Mailpit in development |
 | Organization units | View the tree and add units | Identity & Access → Directory |
 | Accounts views | All, privileged, Linux, Windows accounts with the same actions | Accounts → … |
 | Audit | Tamper-evident audit log of every change | Audit & Compliance → Audit Logs |
@@ -32,9 +36,9 @@ curl. Everything below is also available through the REST API.
 | Phase | Scope |
 |---|---|
 | 4 (remaining) | Policy authoring UI, access reviews, joiner/mover/leaver, on-behalf and server-account requests |
-| 5 | More providers (databases, network, virtualization, storage) |
+| 5 (remaining) | More providers: MySQL/Oracle/SQL Server, network devices, virtualization, storage |
 | 6 | PAM: privileged sessions, SSH/RDP gateways, recording, emergency access |
-| 7 | Reports, access logs, configuration history, settings |
-| 8 | Notifications and integrations |
+| 7 (remaining) | Scheduled/emailed reports, access logs, configuration history, settings |
+| 8 (remaining) | Drift detection and reconciliation, SIEM/ITSM/HR integrations |
 | 9 | Security hardening: image gate back on, SBOM, signing, production settings |
 | 10–12 | HA / scale, operations runbooks, final acceptance |

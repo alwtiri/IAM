@@ -112,7 +112,7 @@ iam:
     dormant-after-days: ${IAM_ACCOUNTS_DORMANT_DAYS:90}
   operations:
     # One durable queue per provider type (G4); must match the worker pools.
-    provider-types: linux-ssh,active-directory,windows-winrm,generic-rest
+    provider-types: linux-ssh,active-directory,windows-winrm,generic-rest,postgresql
     result-queue: iam.core.results
     deadline-sweep-interval: PT15S
   internal-api:
@@ -124,7 +124,7 @@ iam:
     ca-file: /run/secrets/pki_ca_crt
     workers:
       # client certificate CN -> provider types it may serve
-      iam-worker: [linux-ssh, active-directory, windows-winrm, generic-rest]
+      iam-worker: [linux-ssh, active-directory, windows-winrm, generic-rest, postgresql]
 
 management:
   endpoints:

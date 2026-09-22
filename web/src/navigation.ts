@@ -35,7 +35,7 @@ export const NAVIGATION: NavItem[] = [
       leaf('storage', '/assets/storage', 5),
       leaf('networkDevices', '/assets/network', 5),
       leaf('applications', '/assets/applications', 5),
-      leaf('databases', '/assets/databases', 5),
+      leaf('databases', '/assets/databases', 4),
     ],
   },
   {

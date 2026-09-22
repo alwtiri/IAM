@@ -9,6 +9,7 @@ archunit = "1.4.1"
 assertj = "3.27.3"
 mina-sshd = "2.19.0"
 eddsa = "0.3.0"
+postgresql-jdbc = "42.7.13"
 unboundid-ldapsdk = "7.0.5"
 
 [libraries]
@@ -19,6 +20,7 @@ assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
 mina-sshd-core = { module = "org.apache.sshd:sshd-core", version.ref = "mina-sshd" }
 eddsa = { module = "net.i2p.crypto:eddsa", version.ref = "eddsa" }
+postgresql-jdbc = { module = "org.postgresql:postgresql", version.ref = "postgresql-jdbc" }
 unboundid-ldapsdk = { module = "com.unboundid:unboundid-ldapsdk", version.ref = "unboundid-ldapsdk" }
 spring-modulith-bom = { module = "org.springframework.modulith:spring-modulith-bom", version.ref = "spring-modulith" }
 

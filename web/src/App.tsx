@@ -16,7 +16,7 @@ import { ReportsPage } from './pages/Reports';
 import { DashboardPage } from './pages/Dashboard';
 import { MeContext } from './MeContext';
 import { ErrorAlert } from './pages/common';
-import { ServersPage } from './pages/Servers';
+import { DatabasesPage, ServersPage } from './pages/Servers';
 import { AllAccountsPage, LinuxAccountsPage, PrivilegedAccountsPage, ServiceAccountsPage, WindowsAccountsPage } from './pages/Accounts';
 
 const PAGES: Record<string, () => React.JSX.Element> = {
@@ -28,7 +28,8 @@ const PAGES: Record<string, () => React.JSX.Element> = {
   auditLogs: AuditPage,
   allTargets: TargetsPage,
   providerManagement: ProvidersPage,
-  servers: ServersPage,
+  servers: () => <ServersPage />,
+  databases: DatabasesPage,
   directory: OrgUnitsPage,
   accessRequests: AccessRequestsPage,
   reports: ReportsPage,
