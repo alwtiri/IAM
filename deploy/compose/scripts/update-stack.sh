@@ -37,6 +37,12 @@ done
 echo "== Rebuild and restart"
 docker compose up -d --build iam-core iam-worker iam-web
 docker compose restart iam-proxy >/dev/null
+if [ -n "$(docker compose --profile lab ps -q lab-linux 2>/dev/null)" ]; then
+  # refresh the lab sudoers in place (keeps the pinned SSH host key; a rebuild would change it)
+  docker compose --profile lab cp lab/linux/sudoers-svc-iam lab-linux:/etc/sudoers.d/svc-iam >/dev/null 2>&1 \
+    && docker compose --profile lab exec -T lab-linux sh -c 'chown root:root /etc/sudoers.d/svc-iam && chmod 0440 /etc/sudoers.d/svc-iam && visudo -c >/dev/null' \
+    && echo "  lab-linux: sudoers refreshed (password rotation allowed)" || true
+fi
 if [ -n "$(docker compose --profile lab ps -q lab-postgres 2>/dev/null)" ]; then
   # lab databases created before the PostgreSQL 16 ADMIN grant was added to the init script
   docker compose --profile lab exec -T lab-postgres sh -c 'psql -q -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "GRANT readers, alice, bob, app_writer, old_contractor TO iam_service WITH ADMIN TRUE, INHERIT FALSE, SET FALSE"' >/dev/null 2>&1 \
