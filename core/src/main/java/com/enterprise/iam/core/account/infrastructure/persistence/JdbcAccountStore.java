@@ -121,7 +121,8 @@ public class JdbcAccountStore implements AccountStore {
     @Override
     public List<Scoped> list(ScopeFilter filter, ListFilter f, PageRequest page) {
         Map<String, Object> params = new HashMap<>();
-        StringBuilder sql = new StringBuilder(SELECT).append(" WHERE ").append(ScopeSql.predicate(filter, SCOPE, params, "s_"));
+        StringBuilder sql = new StringBuilder(SELECT).append(" WHERE ").append(ScopeSql.predicate(filter, SCOPE, params, "s_"))
+                .append(" AND t.status <> 'DECOMMISSIONED'");
         if (f.targetId() != null) {
             sql.append(" AND a.target_id = :target");
             params.put("target", f.targetId());

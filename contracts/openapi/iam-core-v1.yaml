@@ -1611,6 +1611,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Target'
+    delete:
+      tags:
+      - targets
+      operationId: deleteTarget
+      summary: Delete a server from service (decommission; retires its connections; history kept)
+      x-iam-phase: 6
+      x-iam-permission: target:write
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '204':
+          description: No Content
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: &id011
+              type: object
+              properties:
+                reason:
+                  type: string
+                  maxLength: 500
   /api/v1/provider-instances:
     get:
       tags:
@@ -1704,6 +1733,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProviderInstance'
+    patch:
+      tags:
+      - providers
+      operationId: updateProviderInstance
+      summary: Change endpoint, settings or credential (new Vault version; step-up)
+      x-iam-phase: 6
+      x-iam-permission: provider:write
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - endpoint
+              properties:
+                endpoint:
+                  type: string
+                  maxLength: 500
+                settings:
+                  type: object
+                  additionalProperties:
+                    type: string
+                credential:
+                  type: string
+                  maxLength: 16384
+    delete:
+      tags:
+      - providers
+      operationId: retireProviderInstance
+      summary: Retire a connection (unbind from all servers and disable)
+      x-iam-phase: 6
+      x-iam-permission: provider:write
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '204':
+          description: No Content
   /api/v1/provider-instances/{id}:enable:
     post:
       tags:
@@ -1772,7 +1862,7 @@ paths:
       - name: targetId
         in: query
         required: false
-        schema: &id015
+        schema: &id016
           type: string
           format: uuid
       - name: governanceState
@@ -2128,7 +2218,7 @@ paths:
       - name: providerInstanceId
         in: path
         required: true
-        schema: &id018
+        schema: &id019
           type: string
           format: uuid
       responses:
@@ -2322,6 +2412,30 @@ paths:
             application/json:
               schema:
                 type: object
+    delete:
+      tags:
+      - vault
+      operationId: unmanageCredential
+      summary: Stop managing the password (step-up; Vault versions kept)
+      x-iam-phase: 6
+      x-iam-permission: credential:manage
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '204':
+          description: No Content
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: *id011
   /api/v1/accounts/{id}:vault:
     post:
       tags:
@@ -2350,7 +2464,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: &id011
+            schema: &id012
               type: object
               properties:
                 reason:
@@ -2384,7 +2498,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: *id011
+            schema: *id012
   /api/v1/vaulted-credentials/{id}:checkout:
     post:
       tags:
@@ -2978,7 +3092,7 @@ components:
       - version
       properties:
         id: *id003
-        parentId: &id012
+        parentId: &id013
           type:
           - string
           - 'null'
@@ -3017,7 +3131,7 @@ components:
       - code
       - name
       properties:
-        parentId: *id012
+        parentId: *id013
         kind:
           $ref: '#/components/schemas/OrgUnitKind'
         code:
@@ -3080,7 +3194,7 @@ components:
       - givenName
       - familyName
       properties:
-        orgUnitId: *id012
+        orgUnitId: *id013
         employeeId:
           type:
           - string
@@ -3097,9 +3211,9 @@ components:
           - string
           - 'null'
           maxLength: 200
-        positionId: *id012
-        locationId: *id012
-        managerPersonId: *id012
+        positionId: *id013
+        locationId: *id013
+        managerPersonId: *id013
         employmentStatus:
           $ref: '#/components/schemas/EmploymentStatus'
         startDate:
@@ -3133,7 +3247,7 @@ components:
       - version
       properties:
         id: *id003
-        orgUnitId: *id012
+        orgUnitId: *id013
         employeeId:
           type:
           - string
@@ -3144,9 +3258,9 @@ components:
           type: string
         displayName:
           type: string
-        positionId: *id012
-        locationId: *id012
-        managerPersonId: *id012
+        positionId: *id013
+        locationId: *id013
+        managerPersonId: *id013
         employmentStatus:
           $ref: '#/components/schemas/EmploymentStatus'
         startDate:
@@ -3218,7 +3332,7 @@ components:
         username:
           type: string
           pattern: ^[a-z0-9][a-z0-9._-]{2,63}$
-        validUntil: &id013
+        validUntil: &id014
           type:
           - string
           - 'null'
@@ -3250,7 +3364,7 @@ components:
           - string
           - 'null'
         validFrom: *id004
-        validUntil: *id013
+        validUntil: *id014
         platformUser:
           type: boolean
         version:
@@ -3356,8 +3470,8 @@ components:
           maxItems: 50
           items:
             $ref: '#/components/schemas/ScopeElement'
-        validFrom: *id013
-        validUntil: *id013
+        validFrom: *id014
+        validUntil: *id014
         reason:
           type:
           - string
@@ -3399,11 +3513,11 @@ components:
           - REVOKED
           - EXPIRED
         validFrom: *id004
-        validUntil: *id013
-        grantedBy: *id012
+        validUntil: *id014
+        grantedBy: *id013
         grantedAt: *id004
-        revokedBy: *id012
-        revokedAt: *id013
+        revokedBy: *id013
+        revokedAt: *id014
         reason:
           type:
           - string
@@ -3441,7 +3555,7 @@ components:
           type:
           - string
           - 'null'
-        authenticatedAt: *id013
+        authenticatedAt: *id014
         grants:
           type: array
           items:
@@ -3461,7 +3575,7 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/ScopeElement'
-              validUntil: *id013
+              validUntil: *id014
     AuditEvent:
       type: object
       required:
@@ -3477,7 +3591,7 @@ components:
         seq:
           type: integer
         occurredAt: *id004
-        actorIdentityId: *id012
+        actorIdentityId: *id013
         actorType:
           type: string
           enum:
@@ -3495,7 +3609,7 @@ components:
           type:
           - string
           - 'null'
-        targetId: *id012
+        targetId: *id013
         source:
           type:
           - string
@@ -3518,7 +3632,7 @@ components:
           type:
           - string
           - 'null'
-        providerInstanceId: *id012
+        providerInstanceId: *id013
         details:
           type: object
           additionalProperties:
@@ -3645,10 +3759,10 @@ components:
           - CONFIDENTIAL
           - RESTRICTED
         ownerOrgUnitId: *id003
-        ownerIdentityId: *id012
-        technicalOwnerIdentityId: *id012
-        businessOwnerIdentityId: *id012
-        locationId: *id012
+        ownerIdentityId: *id013
+        technicalOwnerIdentityId: *id013
+        businessOwnerIdentityId: *id013
+        locationId: *id013
         tags:
           type: array
           maxItems: 50
@@ -3719,14 +3833,14 @@ components:
         ownerOrgUnitId:
           type: string
           format: uuid
-        ownerIdentityId: &id014
+        ownerIdentityId: &id015
           type:
           - string
           - 'null'
           format: uuid
-        technicalOwnerIdentityId: *id014
-        businessOwnerIdentityId: *id014
-        locationId: *id014
+        technicalOwnerIdentityId: *id015
+        businessOwnerIdentityId: *id015
+        locationId: *id015
         tags:
           type: array
           maxItems: 50
@@ -3832,7 +3946,7 @@ components:
           - CLOSED
           - OPEN
           - HALF_OPEN
-        lastHealthAt: *id013
+        lastHealthAt: *id014
         failureReason:
           type:
           - string
@@ -3915,11 +4029,11 @@ components:
       - openFindings
       - version
       properties:
-        id: *id015
-        targetId: *id015
+        id: *id016
+        targetId: *id016
         targetName:
           type: string
-        providerInstanceId: *id015
+        providerInstanceId: *id016
         providerType:
           type: string
         nativeId:
@@ -3938,12 +4052,12 @@ components:
           type:
           - string
           - 'null'
-        ownerIdentityId: &id016
+        ownerIdentityId: &id017
           type:
           - string
           - 'null'
           format: uuid
-        linkedIdentityId: *id016
+        linkedIdentityId: *id017
         governanceState:
           $ref: '#/components/schemas/AccountGovernanceState'
         nativeStatus:
@@ -3958,13 +4072,13 @@ components:
           type: object
           additionalProperties:
             type: string
-        lastSeenAt: &id017
+        lastSeenAt: &id018
           type:
           - string
           - 'null'
           format: date-time
-        lastLoginAt: *id017
-        passwordLastSetAt: *id017
+        lastLoginAt: *id018
+        passwordLastSetAt: *id018
         openFindings:
           type: array
           items:
@@ -3993,8 +4107,8 @@ components:
       properties:
         type:
           $ref: '#/components/schemas/AccountType'
-        ownerIdentityId: *id016
-        linkedIdentityId: *id016
+        ownerIdentityId: *id017
+        linkedIdentityId: *id017
         governanceState:
           description: MANAGED is set by credential onboarding and REMOVED by discovery; both are rejected here.
           allOf:
@@ -4014,11 +4128,11 @@ components:
       - severity
       - detectedAt
       properties:
-        id: *id015
-        accountId: *id015
+        id: *id016
+        accountId: *id016
         accountName:
           type: string
-        targetId: *id015
+        targetId: *id016
         targetName:
           type: string
         type:
@@ -4028,7 +4142,7 @@ components:
         detectedAt:
           type: string
           format: date-time
-        resolvedAt: *id017
+        resolvedAt: *id018
         resolution:
           type:
           - string
@@ -4071,10 +4185,10 @@ components:
       - status
       - startedAt
       properties:
-        id: *id015
-        providerInstanceId: *id015
-        targetId: *id015
-        operationId: *id016
+        id: *id016
+        providerInstanceId: *id016
+        targetId: *id016
+        operationId: *id017
         status:
           type: string
           enum:
@@ -4084,7 +4198,7 @@ components:
         startedAt:
           type: string
           format: date-time
-        finishedAt: *id017
+        finishedAt: *id018
         accountsSeen:
           type: integer
         accountsNew:
@@ -4105,8 +4219,8 @@ components:
       - providerType
       - channel
       properties:
-        targetId: *id018
-        providerInstanceId: *id018
+        targetId: *id019
+        providerInstanceId: *id019
         providerType:
           type: string
         providerName:
@@ -4118,7 +4232,7 @@ components:
       required:
       - providerInstanceId
       properties:
-        providerInstanceId: *id018
+        providerInstanceId: *id019
         channel:
           type:
           - string
@@ -4130,14 +4244,14 @@ components:
       required:
       - providerInstanceId
       properties:
-        providerInstanceId: *id018
+        providerInstanceId: *id019
     OperationSubmitted:
       type: object
       required:
       - operationId
       description: Poll GET /api/v1/operations/{operationId} for progress.
       properties:
-        operationId: *id018
+        operationId: *id019
         discoveryRunId:
           type:
           - string

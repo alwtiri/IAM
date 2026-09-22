@@ -58,6 +58,18 @@ export interface Target {
   environment: string;
   criticality: string;
   status: string;
+  ipAddress?: string | null;
+  dnsName?: string | null;
+  platform?: string | null;
+  operatingSystem?: string | null;
+  classification?: string | null;
+  ownerOrgUnitId?: string | null;
+  ownerIdentityId?: string | null;
+  technicalOwnerIdentityId?: string | null;
+  businessOwnerIdentityId?: string | null;
+  locationId?: string | null;
+  tags?: string[];
+  version?: number;
 }
 
 export interface ProviderInstance {
@@ -68,6 +80,8 @@ export interface ProviderInstance {
   credentialConfigured: boolean;
   enabled: boolean;
   health: string;
+  settings?: Record<string, string>;
+  version?: number;
 }
 
 export interface ComponentHealth {

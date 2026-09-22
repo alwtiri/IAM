@@ -209,6 +209,7 @@ export function VaultPage() {
   const [actionError, setActionError] = useState<unknown>();
   const [info, setInfo] = useState<string>();
   const [checkout, setCheckout] = useState<VaultedCredential>();
+  const [removing, setRemoving] = useState<VaultedCredential>();
   const load = useCallback(() => {
     apiFetch<VaultedCredential[]>('/api/v1/vaulted-credentials').then(setRows, setError);
   }, []);
@@ -264,6 +265,8 @@ export function VaultPage() {
                     <Button size="small" disabled={!!v.activeCheckout || v.rotationStatus === 'ROTATING'} onClick={() => rotate(v)}>{t.rotateNow}</Button>
                     <Button size="small" variant="outlined" disabled={!!v.activeCheckout || v.rotationStatus !== 'VERIFIED' && v.rotationStatus !== 'UNKNOWN'}
                       onClick={() => setCheckout(v)}>{t.checkOut}</Button>
+                    <Button size="small" color="error" disabled={!!v.activeCheckout || v.rotationStatus === 'ROTATING'}
+                      onClick={() => setRemoving(v)}>{t.removeFromVault}</Button>
                   </Stack>
                 ) : null),
               },
@@ -271,6 +274,20 @@ export function VaultPage() {
           )}
         </>
       )}
+      <Dialog open={!!removing} onClose={() => setRemoving(undefined)} fullWidth maxWidth="sm">
+        <DialogTitle>{t.removeFromVault}{removing ? ` — ${removing.accountName} @ ${removing.targetName}` : ''}</DialogTitle>
+        <DialogContent><Typography color="text.secondary" sx={{ mt: 1 }}>{t.removeFromVaultBody}</Typography></DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRemoving(undefined)}>{t.cancel}</Button>
+          <Button variant="contained" color="error" onClick={() => {
+            const v = removing;
+            setRemoving(undefined);
+            if (!v) return;
+            apiFetch(`/api/v1/vaulted-credentials/${v.accountId}`, { method: 'DELETE', body: JSON.stringify({ reason: 'removed in the UI' }) })
+              .then(() => { setInfo(t.deleted); load(); }, setActionError);
+          }}>{t.removeFromVault}</Button>
+        </DialogActions>
+      </Dialog>
       <CheckoutDialog open={!!checkout} submitLabel={t.checkOut}
         title={checkout ? format(t.checkOutTitle, { account: checkout.accountName, server: checkout.targetName }) : ''}
         onClose={() => setCheckout(undefined)}

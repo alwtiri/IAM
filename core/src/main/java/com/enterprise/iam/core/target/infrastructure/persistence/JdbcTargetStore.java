@@ -95,7 +95,8 @@ public class JdbcTargetStore implements TargetStore {
     @Override
     public List<Scoped> list(ScopeFilter filter, String type, String environment, PageRequest page) {
         Map<String, Object> params = new HashMap<>();
-        StringBuilder sql = new StringBuilder(SELECT).append(" WHERE ").append(ScopeSql.predicate(filter, SCOPE, params, "s_"));
+        StringBuilder sql = new StringBuilder(SELECT).append(" WHERE ").append(ScopeSql.predicate(filter, SCOPE, params, "s_"))
+                .append(" AND t.status <> 'DECOMMISSIONED'");
         if (type != null) {
             sql.append(" AND t.type = :type");
             params.put("type", type);

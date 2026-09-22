@@ -300,4 +300,16 @@ class CredentialVaultServiceTest {
         assertEquals(current, row.currentRef());
         assertNull(row.pendingRef());
     }
+
+    @Test
+    void unmanageStopsRotationAndCanBeManagedAgain() {
+        vault.manage(TestSupport.actor(admin), root.id(), null);
+        assertThrows(IamException.class, () -> vault.unmanage(TestSupport.actor(admin), root.id(), "x"), "not while rotating");
+        complete("SUCCESS");
+        vault.unmanage(TestSupport.actor(admin), root.id(), "decommissioned");
+        assertNull(store.rows.get(root.id()).secretPath());
+        assertTrue(vault.checkoutTargets().isEmpty() || vault.checkoutTargets().stream().noneMatch(t -> t.accountId().equals(root.id()) && t.available()));
+        vault.manage(TestSupport.actor(admin), root.id(), "again");
+        assertEquals("ROTATING", store.rows.get(root.id()).rotationStatus());
+    }
 }

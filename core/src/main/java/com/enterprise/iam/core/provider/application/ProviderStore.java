@@ -35,4 +35,14 @@ public interface ProviderStore {
     }
 
     boolean isBound(UUID targetId, UUID providerInstanceId);
+
+    /** Updates endpoint, settings and credential reference (optimistic lock). */
+    default boolean update(ProviderInstance p, long expectedVersion) {
+        throw new UnsupportedOperationException("update");
+    }
+
+    /** Targets a provider instance is bound to. */
+    default List<UUID> targetsOf(UUID providerInstanceId) {
+        return List.of();
+    }
 }

@@ -13,6 +13,9 @@ export function OrgUnitsPage() {
   const [units, setUnits] = useState<OrgUnit[]>();
   const [error, setError] = useState<unknown>();
   const [adding, setAdding] = useState(false);
+  const [renaming, setRenaming] = useState<OrgUnit & { version?: number }>();
+  const [newName, setNewName] = useState('');
+  const [renameError, setRenameError] = useState<unknown>();
 
   const load = useCallback(async () => {
     try {
@@ -43,8 +46,28 @@ export function OrgUnitsPage() {
             { header: t.code, cell: (u) => u.code },
             { header: t.type, cell: (u) => <Chip size="small" variant="outlined" label={u.kind} /> },
             { header: 'Path', cell: (u) => <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>{u.path}</Typography> },
+            { header: t.action, cell: (u) => <Button size="small" onClick={() => { setRenaming(u); setNewName(u.name); setRenameError(undefined); }}>{t.edit}</Button> },
           ]} />
         </CardContent></Card>
+      )}
+      {renaming && (
+        <Dialog open onClose={() => setRenaming(undefined)} fullWidth maxWidth="sm">
+          <DialogTitle>{t.edit} — {renaming.code}</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              {renameError !== undefined && <ErrorAlert error={renameError} />}
+              <TextField required label={t.name} value={newName} onChange={(e) => setNewName(e.target.value)} />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setRenaming(undefined)}>{t.cancel}</Button>
+            <Button variant="contained" disabled={!newName.trim()} onClick={() => {
+              apiFetch(`/api/v1/org-units/${renaming.id}`, { method: 'PATCH', headers: { 'If-Match': String(renaming.version ?? 0) },
+                body: JSON.stringify({ name: newName.trim() }) })
+                .then(() => { setRenaming(undefined); void load(); }, setRenameError);
+            }}>{t.save}</Button>
+          </DialogActions>
+        </Dialog>
       )}
       {adding && <AddOrgUnitDialog units={units} onClose={() => setAdding(false)} onCreated={() => { setAdding(false); void load(); }} />}
     </Stack>

@@ -52,7 +52,8 @@ public class JdbcCredentialVaultStore implements CredentialVaultStore {
                     rotation_operation_id, rotation_trigger, last_rotation_error, last_rotated_at, rotation_interval_days, managed_by,
                     created_at, updated_at, version)
                 VALUES (:a, :path, :cur, :pending, :status, :op, :trigger, :error, :rotated, :interval, :by, :now, :now, 0)
-                ON CONFLICT (account_id) DO UPDATE SET secret_path = EXCLUDED.secret_path, pending_secret_ref = EXCLUDED.pending_secret_ref,
+                ON CONFLICT (account_id) DO UPDATE SET secret_path = EXCLUDED.secret_path,
+                    credential_secret_ref = EXCLUDED.credential_secret_ref, last_rotation_error = NULL, pending_secret_ref = EXCLUDED.pending_secret_ref,
                     rotation_status = EXCLUDED.rotation_status, rotation_operation_id = EXCLUDED.rotation_operation_id,
                     rotation_trigger = EXCLUDED.rotation_trigger, managed_by = EXCLUDED.managed_by, updated_at = EXCLUDED.updated_at,
                     version = account.managed_account.version + 1""")

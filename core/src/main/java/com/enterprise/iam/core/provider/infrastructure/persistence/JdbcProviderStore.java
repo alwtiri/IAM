@@ -94,6 +94,22 @@ public class JdbcProviderStore implements ProviderStore {
     }
 
     @Override
+    public boolean update(ProviderInstance p, long expectedVersion) {
+        return jdbc.sql("""
+                UPDATE provider.provider_instance SET endpoint = :endpoint, settings = CAST(:settings AS jsonb), credential_secret_ref = :ref,
+                    updated_at = now(), version = version + 1
+                WHERE id = :id AND version = :v""")
+                .param("endpoint", p.endpoint()).param("settings", json(p.settings())).param("ref", p.credentialSecretRef())
+                .param("id", p.id()).param("v", expectedVersion).update() == 1;
+    }
+
+    @Override
+    public List<UUID> targetsOf(UUID providerInstanceId) {
+        return jdbc.sql("SELECT target_id FROM provider.target_binding WHERE provider_instance_id = :p").param("p", providerInstanceId)
+                .query((rs, n) -> uuid(rs, "target_id")).list();
+    }
+
+    @Override
     public boolean unbind(UUID targetId, UUID providerInstanceId) {
         return jdbc.sql("DELETE FROM provider.target_binding WHERE target_id = :t AND provider_instance_id = :p")
                 .param("t", targetId).param("p", providerInstanceId).update() > 0;

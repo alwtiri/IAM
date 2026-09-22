@@ -123,6 +123,28 @@ public class CredentialVaultService implements CredentialCheckouts {
     }
 
     /**
+     * Stops managing the account's password (the platform no longer rotates or releases it). Vault versions are kept for
+     * audit. Refused while the password is checked out or a rotation is in flight.
+     */
+    public void unmanage(CurrentActor actor, UUID accountId, String reason) {
+        tx.run(() -> {
+            AccountStore.Scoped s = scoped(accountId);
+            guard.require(actor, Permissions.CREDENTIAL_MANAGE, AccountService.scope(s), true);
+            Vaulted v = store.lock(accountId).filter(x -> x.secretPath() != null).orElseThrow(() -> IamException.notFound("Vaulted credential"));
+            if (store.activeCheckout(accountId).isPresent()) {
+                throw IamException.validation("accountId", "CHECKED_OUT", "the password is checked out; end the checkout first");
+            }
+            if ("ROTATING".equals(v.rotationStatus())) {
+                throw IamException.validation("accountId", "ROTATING", "a rotation is in progress; try again in a minute");
+            }
+            save(new Vaulted(accountId, null, null, null, "NONE", null, null, null, v.lastRotatedAt(), v.rotationIntervalDays(), v.managedBy(),
+                    v.createdAt(), v.version()), clock.instant());
+            audit.record(actor, new AuditEntry("credential.unmanaged", "account", accountId.toString(), s.account().targetId(),
+                    AuditEntry.Result.SUCCESS, reason, s.account().providerInstanceId(), Map.of("vaultPath", String.valueOf(v.secretPath()))));
+        });
+    }
+
+    /**
      * Writes a new pending version to Vault and sends the rotation to the worker plane. Caller holds the transaction.
      * A rotation already in flight is not duplicated.
      */
@@ -340,6 +362,9 @@ public class CredentialVaultService implements CredentialCheckouts {
         return tx.readOnly(() -> {
             List<VaultedCredentialView> out = new ArrayList<>();
             for (Vaulted v : store.all()) {
+                if (v.secretPath() == null) {
+                    continue;
+                }
                 Optional<AccountStore.Scoped> s = accounts.find(v.accountId());
                 if (s.isPresent() && guard.isAllowed(actor, Permissions.ACCOUNT_READ, AccountService.scope(s.get()))) {
                     out.add(view(v, s.get()));
@@ -368,7 +393,7 @@ public class CredentialVaultService implements CredentialCheckouts {
 
     @Override
     public List<CheckoutTarget> checkoutTargets() {
-        return tx.readOnly(() -> store.all().stream().map(v -> target(v).orElse(null)).filter(t -> t != null).toList());
+        return tx.readOnly(() -> store.all().stream().filter(v -> v.secretPath() != null).map(v -> target(v).orElse(null)).filter(t -> t != null).toList());
     }
 
     @Override

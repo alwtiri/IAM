@@ -7,6 +7,7 @@ import { apiFetch } from '../api/client';
 import { submitAndWait } from '../api/operations';
 import type { DiscoveryRun, Operation, OrgUnit, Page, ProviderBinding, ProviderInstance, Target } from '../api/types';
 import { useLocale } from '../i18n/LocaleContext';
+import { format } from '../i18n/messages';
 import { AccountsTable, OperationOutcome } from './Accounts';
 import { DataTable, ErrorAlert } from './common';
 
@@ -24,6 +25,9 @@ export function ServersPage({ kind = 'servers' }: { kind?: 'servers' | 'database
   const [error, setError] = useState<unknown>();
   const [adding, setAdding] = useState(false);
   const [selected, setSelected] = useState<Target>();
+  const [editing, setEditing] = useState<Target>();
+  const [deleting, setDeleting] = useState<Target>();
+  const [info, setInfo] = useState<string>();
 
   const load = useCallback(async () => {
     try {
@@ -40,7 +44,8 @@ export function ServersPage({ kind = 'servers' }: { kind?: 'servers' | 'database
   }, [load]);
 
   if (selected) {
-    return <ServerDetail server={selected} onBack={() => setSelected(undefined)} />;
+    return <ServerDetail server={selected} onBack={() => { setSelected(undefined); void load(); }}
+      onChanged={(s) => setSelected(s)} onDeleted={() => { setSelected(undefined); setInfo(t.deleted); void load(); }} />;
   }
   if (error) return <ErrorAlert error={error} />;
   if (!servers) return <CircularProgress aria-label={t.loading} />;
@@ -50,6 +55,7 @@ export function ServersPage({ kind = 'servers' }: { kind?: 'servers' | 'database
         <Typography variant="h5" component="h2">{title}</Typography>
         <Button variant="contained" onClick={() => setAdding(true)}>{kind === 'databases' ? t.addDatabase : t.addServer}</Button>
       </Stack>
+      {info && <Alert severity="success" onClose={() => setInfo(undefined)}>{info}</Alert>}
       {servers.length === 0 ? <Alert severity="info">{t.noServers}</Alert> : (
         <DataTable<Target> title="" rows={servers} rowKey={(s) => s.id} columns={[
           { header: t.name, cell: (s) => <Button size="small" onClick={() => setSelected(s)}>{s.name}</Button> },
@@ -58,9 +64,22 @@ export function ServersPage({ kind = 'servers' }: { kind?: 'servers' | 'database
           { header: t.environment, cell: (s) => s.environment },
           { header: t.criticality, cell: (s) => s.criticality },
           { header: t.state, cell: (s) => s.status },
+          {
+            header: t.action, cell: (s) => (
+              <Stack direction="row" spacing={0.5}>
+                <Button size="small" onClick={() => setSelected(s)}>{t.connections}</Button>
+                <Button size="small" onClick={() => setEditing(s)}>{t.edit}</Button>
+                <Button size="small" color="error" onClick={() => setDeleting(s)}>{t.delete}</Button>
+              </Stack>
+            ),
+          },
         ]} />
       )}
       {adding && <AddServerDialog types={types} onClose={() => setAdding(false)} onCreated={(s) => { setAdding(false); void load(); setSelected(s); }} />}
+      {editing && <AddServerDialog types={types} existing={editing} onClose={() => setEditing(undefined)}
+        onCreated={() => { setEditing(undefined); setInfo(t.saved); void load(); }} />}
+      {deleting && <DeleteServerDialog server={deleting} onClose={() => setDeleting(undefined)}
+        onDeleted={() => { setDeleting(undefined); setInfo(t.deleted); void load(); }} />}
     </Stack>
   );
 }
@@ -69,10 +88,15 @@ function typeLabel(t: ReturnType<typeof useLocale>['t'], type: string) {
   return type === 'LINUX_SERVER' ? t.linuxServer : type === 'WINDOWS_SERVER' ? t.windowsServer : type === 'DATABASE' ? t.postgresDatabase : type;
 }
 
-function AddServerDialog({ types, onClose, onCreated }: { types: readonly string[]; onClose: () => void; onCreated: (t: Target) => void }) {
+function AddServerDialog({ types, existing, onClose, onCreated }: {
+  types: readonly string[]; existing?: Target; onClose: () => void; onCreated: (t: Target) => void;
+}) {
   const { t } = useLocale();
   const [units, setUnits] = useState<OrgUnit[]>([]);
-  const [form, setForm] = useState({ name: '', hostname: '', type: types[0] ?? 'LINUX_SERVER', environment: 'PRODUCTION', criticality: 'MEDIUM', ownerOrgUnitId: '' });
+  const [form, setForm] = useState({
+    name: existing?.name ?? '', hostname: existing?.hostname ?? '', type: existing?.type ?? types[0] ?? 'LINUX_SERVER',
+    environment: existing?.environment ?? 'PRODUCTION', criticality: existing?.criticality ?? 'MEDIUM', ownerOrgUnitId: existing?.ownerOrgUnitId ?? '',
+  });
   const [error, setError] = useState<unknown>();
   const [saving, setSaving] = useState(false);
 
@@ -87,13 +111,19 @@ function AddServerDialog({ types, onClose, onCreated }: { types: readonly string
   const save = async () => {
     setSaving(true);
     try {
-      const created = await apiFetch<Target>('/api/v1/targets', {
-        method: 'POST',
-        body: JSON.stringify({ ...form, hostname: form.hostname || null,
-          operatingSystem: form.type === 'LINUX_SERVER' ? 'Linux' : form.type === 'WINDOWS_SERVER' ? 'Windows' : null,
-          platform: form.type === 'DATABASE' ? 'PostgreSQL' : null }),
-      });
-      onCreated(created);
+      const saved = existing
+        ? await apiFetch<Target>(`/api/v1/targets/${existing.id}`, {
+          method: 'PATCH',
+          headers: { 'If-Match': String(existing.version ?? 0) },
+          body: JSON.stringify({ ...existing, ...form, hostname: form.hostname || null }),
+        })
+        : await apiFetch<Target>('/api/v1/targets', {
+          method: 'POST',
+          body: JSON.stringify({ ...form, hostname: form.hostname || null,
+            operatingSystem: form.type === 'LINUX_SERVER' ? 'Linux' : form.type === 'WINDOWS_SERVER' ? 'Windows' : null,
+            platform: form.type === 'DATABASE' ? 'PostgreSQL' : null }),
+        });
+      onCreated(saved);
     } catch (e) {
       setError(e);
     } finally {
@@ -103,13 +133,13 @@ function AddServerDialog({ types, onClose, onCreated }: { types: readonly string
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{t.addServer}</DialogTitle>
+      <DialogTitle>{existing ? t.editServer : t.addServer}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           {error !== undefined && <ErrorAlert error={error} />}
           <TextField required label={t.name} value={form.name} onChange={set('name')} />
           <TextField required label={t.hostname} value={form.hostname} onChange={set('hostname')} placeholder="srv01.example.org" />
-          <TextField select label={t.serverType} value={form.type} onChange={set('type')}>
+          <TextField select label={t.serverType} value={form.type} onChange={set('type')} disabled={!!existing}>
             {types.map((x) => <MenuItem key={x} value={x}>{typeLabel(t, x)}</MenuItem>)}
           </TextField>
           <TextField select label={t.environment} value={form.environment} onChange={set('environment')}>
@@ -131,8 +161,15 @@ function AddServerDialog({ types, onClose, onCreated }: { types: readonly string
   );
 }
 
-function ServerDetail({ server, onBack }: { server: Target; onBack: () => void }) {
+function ServerDetail({ server, onBack, onChanged, onDeleted }: {
+  server: Target; onBack: () => void; onChanged: (s: Target) => void; onDeleted: () => void;
+}) {
   const { t } = useLocale();
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [editConn, setEditConn] = useState<ProviderBinding>();
+  const [deleteConn, setDeleteConn] = useState<ProviderBinding>();
+  const [instances, setInstances] = useState<Record<string, ProviderInstance>>({});
   const [bindings, setBindings] = useState<ProviderBinding[]>();
   const [runs, setRuns] = useState<DiscoveryRun[]>([]);
   const [error, setError] = useState<unknown>();
@@ -149,6 +186,8 @@ function ServerDetail({ server, onBack }: { server: Target; onBack: () => void }
       ]);
       setBindings(b);
       setRuns(r);
+      const found = await Promise.all(b.map((x) => apiFetch<ProviderInstance>(`/api/v1/provider-instances/${x.providerInstanceId}`).catch(() => undefined)));
+      setInstances(Object.fromEntries(found.filter((x): x is ProviderInstance => !!x).map((x) => [x.id, x])));
       setError(undefined);
     } catch (e) {
       setError(e);
@@ -175,14 +214,32 @@ function ServerDetail({ server, onBack }: { server: Target; onBack: () => void }
     }
   };
 
+  const toggle = async (b: ProviderBinding) => {
+    const inst = instances[b.providerInstanceId];
+    try {
+      await apiFetch(`/api/v1/provider-instances/${b.providerInstanceId}:${inst?.enabled === false ? 'enable' : 'disable'}`, { method: 'POST' });
+      await load();
+    } catch (e) {
+      setError(e);
+    }
+  };
+
   return (
     <Stack spacing={3}>
       <Box>
         <Button onClick={onBack}>← {t.back}</Button>
-        <Typography variant="h5" component="h2">{server.name}</Typography>
-        <Typography color="text.secondary">
-          {server.hostname} · {typeLabel(t, server.type)} · {server.environment} · {server.criticality}
-        </Typography>
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={1}>
+          <Box>
+            <Typography variant="h5" component="h2">{server.name}</Typography>
+            <Typography color="text.secondary">
+              {server.hostname} · {typeLabel(t, server.type)} · {server.environment} · {server.criticality}
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" onClick={() => setEditing(true)}>{t.edit}</Button>
+            <Button variant="outlined" color="error" onClick={() => setDeleting(true)}>{t.delete}</Button>
+          </Stack>
+        </Stack>
       </Box>
       {error !== undefined && <ErrorAlert error={error} />}
       {outcome && <OperationOutcome op={outcome} />}
@@ -196,11 +253,19 @@ function ServerDetail({ server, onBack }: { server: Target; onBack: () => void }
           <DataTable<ProviderBinding> title="" rows={bindings} rowKey={(b) => b.providerInstanceId} columns={[
             { header: t.name, cell: (b) => b.providerName },
             { header: t.type, cell: (b) => b.providerType },
+            { header: t.endpoint, cell: (b) => instances[b.providerInstanceId]?.endpoint ?? '' },
+            {
+              header: t.status, cell: (b) => (instances[b.providerInstanceId]?.enabled === false
+                ? <Chip size="small" label={t.disabledLabel} /> : <Chip size="small" color="success" label={t.enabledLabel} />),
+            },
             {
               header: t.action, cell: (b) => (busy?.startsWith(b.providerInstanceId) ? <CircularProgress size={20} aria-label={t.working} /> : (
-                <Stack direction="row" spacing={1}>
+                <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
                   <Button size="small" variant="outlined" onClick={() => void act(b, 'test')}>{t.testConnection}</Button>
                   <Button size="small" variant="contained" onClick={() => void act(b, 'discover')}>{t.discoverAccounts}</Button>
+                  <Button size="small" onClick={() => setEditConn(b)}>{t.edit}</Button>
+                  <Button size="small" onClick={() => void toggle(b)}>{instances[b.providerInstanceId]?.enabled === false ? t.enable : t.disable}</Button>
+                  <Button size="small" color="error" onClick={() => setDeleteConn(b)}>{t.delete}</Button>
                 </Stack>
               )),
             },
@@ -222,6 +287,22 @@ function ServerDetail({ server, onBack }: { server: Target; onBack: () => void }
       <AccountsTable key={accountsKey} query={`?targetId=${server.id}&limit=200`} title={t.accountsOnServer} showServer={false} />
 
       {connecting && <ConnectDialog server={server} onClose={() => setConnecting(false)} onConnected={() => { setConnecting(false); void load(); }} />}
+      {editing && <AddServerDialog types={[server.type]} existing={server} onClose={() => setEditing(false)}
+        onCreated={(s) => { setEditing(false); onChanged(s); }} />}
+      {deleting && <DeleteServerDialog server={server} onClose={() => setDeleting(false)} onDeleted={onDeleted} />}
+      {editConn && instances[editConn.providerInstanceId] && (
+        <EditConnectionDialog instance={instances[editConn.providerInstanceId] as ProviderInstance} onClose={() => setEditConn(undefined)}
+          onSaved={() => { setEditConn(undefined); void load(); }} />
+      )}
+      {deleteConn && (
+        <ConfirmDialog title={format(t.deleteConnectionTitle, { name: deleteConn.providerName })} body={t.deleteConnectionBody} confirmLabel={t.delete}
+          onClose={() => setDeleteConn(undefined)}
+          onConfirm={async () => {
+            await apiFetch(`/api/v1/provider-instances/${deleteConn.providerInstanceId}`, { method: 'DELETE' });
+            setDeleteConn(undefined);
+            await load();
+          }} />
+      )}
     </Stack>
   );
 }
@@ -404,4 +485,86 @@ function PostgresConnectDialog({ server, onClose, onConnected }: { server: Targe
 
 export function DatabasesPage() {
   return <ServersPage kind="databases" />;
+}
+
+
+/** Confirmation dialog; when {@code confirmText} is set the user must type it (for destructive actions). */
+function ConfirmDialog({ title, body, confirmLabel, confirmText, onClose, onConfirm }: {
+  title: string; body: string; confirmLabel: string; confirmText?: string; onClose: () => void; onConfirm: () => Promise<void>;
+}) {
+  const { t } = useLocale();
+  const [typed, setTyped] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>();
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{title}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          {error !== undefined && <ErrorAlert error={error} />}
+          <Typography color="text.secondary">{body}</Typography>
+          {confirmText && <TextField label={t.typeNameToConfirm} placeholder={confirmText} value={typed} onChange={(e) => setTyped(e.target.value)} />}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{t.cancel}</Button>
+        <Button variant="contained" color="error" disabled={busy || (!!confirmText && typed.trim() !== confirmText)} onClick={() => {
+          setBusy(true);
+          setError(undefined);
+          onConfirm().catch(setError).finally(() => setBusy(false));
+        }}>{confirmLabel}</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function DeleteServerDialog({ server, onClose, onDeleted }: { server: Target; onClose: () => void; onDeleted: () => void }) {
+  const { t } = useLocale();
+  return (
+    <ConfirmDialog title={format(t.deleteServerTitle, { name: server.name })} body={t.deleteServerBody} confirmLabel={t.delete}
+      confirmText={server.name} onClose={onClose}
+      onConfirm={async () => {
+        await apiFetch(`/api/v1/targets/${server.id}`, { method: 'DELETE', body: JSON.stringify({ reason: 'deleted in the UI' }) });
+        onDeleted();
+      }} />
+  );
+}
+
+/** Edits any connection type: endpoint, settings and (optionally) a new credential that becomes a new Vault version. */
+function EditConnectionDialog({ instance, onClose, onSaved }: { instance: ProviderInstance; onClose: () => void; onSaved: () => void }) {
+  const { t } = useLocale();
+  const [endpoint, setEndpoint] = useState(instance.endpoint);
+  const [settings, setSettings] = useState<[string, string][]>(Object.entries(instance.settings ?? {}));
+  const [secret, setSecret] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>();
+  const multiline = (k: string) => /pem|certificate/i.test(k);
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{t.editConnection} — {instance.name}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          {error !== undefined && <ErrorAlert error={error} />}
+          <TextField required label={t.endpoint} value={endpoint} onChange={(e) => setEndpoint(e.target.value)} />
+          <Typography variant="subtitle2">{t.settingsLabel}</Typography>
+          {settings.map(([k, v], i) => (
+            <TextField key={k} label={k} value={v} multiline={multiline(k)} minRows={multiline(k) ? 3 : undefined}
+              onChange={(e) => setSettings(settings.map((x, j) => (j === i ? [k, e.target.value] : x)))} />
+          ))}
+          <TextField label={t.newSecretOptional} value={secret} onChange={(e) => setSecret(e.target.value)} multiline minRows={3} autoComplete="off" />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{t.cancel}</Button>
+        <Button variant="contained" disabled={busy || !endpoint.trim()} onClick={() => {
+          setBusy(true);
+          setError(undefined);
+          apiFetch(`/api/v1/provider-instances/${instance.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ endpoint: endpoint.trim(), settings: Object.fromEntries(settings.filter(([, v]) => v !== '')), credential: secret || null }),
+          }).then(onSaved, setError).finally(() => setBusy(false));
+        }}>{t.save}</Button>
+      </DialogActions>
+    </Dialog>
+  );
 }

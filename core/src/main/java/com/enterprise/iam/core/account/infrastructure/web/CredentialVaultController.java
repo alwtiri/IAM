@@ -71,6 +71,14 @@ class CredentialVaultController {
         return vault.rotate(actors.require(), accountId, r == null ? null : r.reason());
     }
 
+    @org.springframework.web.bind.annotation.DeleteMapping("/vaulted-credentials/{accountId}")
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
+    @RequiresPermission(Permissions.CREDENTIAL_MANAGE)
+    @RequiresStepUp
+    void unmanage(@PathVariable UUID accountId, @Valid @RequestBody(required = false) ReasonRequest r) {
+        vault.unmanage(actors.require(), accountId, r == null ? null : r.reason());
+    }
+
     @PostMapping("/vaulted-credentials/{accountId}:checkout")
     @RequiresPermission(Permissions.CREDENTIAL_MANAGE)
     @RequiresStepUp
