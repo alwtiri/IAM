@@ -52,6 +52,8 @@ public class AccountOperationService {
     private static final Duration DISCOVERY_TIMEOUT = Duration.ofMinutes(30);
     private static final Duration LIFECYCLE_TIMEOUT = Duration.ofMinutes(2);
     private static final Duration HANDLE_TTL = Duration.ofMinutes(10);
+    private static final Duration TEST_TIMEOUT = Duration.ofMinutes(1);
+    private static final Duration TEST_HANDLE_TTL = Duration.ofMinutes(2);
 
     private final AccountService accounts;
     private final AccountStore store;
@@ -98,6 +100,27 @@ public class AccountOperationService {
             audit.record(actor, new AuditEntry("account.discovery-requested", "target", targetId.toString(), targetId,
                     AuditEntry.Result.SUCCESS, null, providerInstanceId, Map.of("operation", opId.toString(), "run", runId.toString())));
             return new Submitted(opId, runId);
+        });
+    }
+
+    /** Connection test of a provider instance bound to a target (VALIDATE_CONNECTION; read-only, result on the operation). */
+    public Submitted requestConnectionTest(CurrentActor actor, UUID targetId, UUID providerInstanceId) {
+        return tx.inTransaction(() -> {
+            ProviderDirectory.Connection c = connection(providerInstanceId);
+            ResourceScope targetScope = targets.scopeOf(targetId).orElseThrow(() -> IamException.notFound("Target"));
+            ResourceScope scope = new ResourceScope(targetScope.orgUnitPath(), targetScope.environment(), c.type(), c.id(), targetId);
+            guard.require(actor, Permissions.ACCOUNT_DISCOVER, scope, true);
+            if (!providers.isBound(targetId, providerInstanceId)) {
+                throw IamException.validation("providerInstanceId", "NOT_BOUND", "bind the provider instance to the target first");
+            }
+            ProviderCommand cmd = new ProviderCommand("VALIDATE_CONNECTION", false, c.type(), c.id(), targetId, null, actor.identityId(),
+                    targetScope.orgUnitPath(), targetScope.environment(), Map.of("connection", connectionPayload(c)), TEST_TIMEOUT, 1,
+                    "validate:" + targetId + ":" + providerInstanceId + ":" + UUID.randomUUID());
+            UUID opId = operations.create(cmd);
+            operations.dispatch(opId, cmd, handles.issue(opId, c.type(), Map.of("connection", new SecretRef(c.credentialSecretRef())), TEST_HANDLE_TTL));
+            audit.record(actor, new AuditEntry("target.connection-test-requested", "target", targetId.toString(), targetId,
+                    AuditEntry.Result.SUCCESS, null, providerInstanceId, Map.of("operation", opId.toString())));
+            return new Submitted(opId, null);
         });
     }
 

@@ -45,7 +45,7 @@ export function usePaged<T>(path: string) {
     void load();
   }, [load]);
 
-  return { items, cursor, loading, error, loadMore: () => load(cursor) };
+  return { items, cursor, loading, error, loadMore: () => load(cursor), reload: () => load() };
 }
 
 export function DataTable<T>({ title, columns, rows, rowKey, footer }: {

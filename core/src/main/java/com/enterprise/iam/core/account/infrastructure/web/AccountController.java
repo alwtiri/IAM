@@ -111,6 +111,13 @@ class AccountController {
         return operations.requestDiscovery(actors.require(), id, r.providerInstanceId());
     }
 
+    @PostMapping("/targets/{id}:test-connection")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @RequiresPermission(Permissions.ACCOUNT_DISCOVER)
+    AccountOperationService.Submitted testConnection(@PathVariable UUID id, @Valid @RequestBody DiscoveryRequest r) {
+        return operations.requestConnectionTest(actors.require(), id, r.providerInstanceId());
+    }
+
     @PostMapping("/accounts/{id}:enable")
     @ResponseStatus(HttpStatus.ACCEPTED)
     @RequiresPermission(Permissions.OPERATION_EXECUTE)

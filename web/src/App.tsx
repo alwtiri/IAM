@@ -10,6 +10,8 @@ import { Shell } from './layout/Shell';
 import { flatten, isAvailable, type NavItem } from './navigation';
 import { AuditPage, HealthPage, PlannedPage, ProvidersPage, RolesPage, TargetsPage, UsersPage } from './pages/Pages';
 import { ErrorAlert } from './pages/common';
+import { ServersPage } from './pages/Servers';
+import { AllAccountsPage, LinuxAccountsPage, PrivilegedAccountsPage, WindowsAccountsPage } from './pages/Accounts';
 
 const PAGES: Record<string, () => React.JSX.Element> = {
   dashboard: HealthPage,
@@ -20,6 +22,11 @@ const PAGES: Record<string, () => React.JSX.Element> = {
   auditLogs: AuditPage,
   allTargets: TargetsPage,
   providerManagement: ProvidersPage,
+  servers: ServersPage,
+  allAccounts: AllAccountsPage,
+  privilegedAccounts: PrivilegedAccountsPage,
+  linuxAccounts: LinuxAccountsPage,
+  windowsAccounts: WindowsAccountsPage,
 };
 
 function routeElement(item: NavItem) {

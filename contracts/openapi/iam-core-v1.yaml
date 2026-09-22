@@ -1658,6 +1658,39 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/StartDiscovery'
+  /api/v1/targets/{id}:test-connection:
+    post:
+      tags:
+      - accounts
+      operationId: testTargetConnection
+      summary: Test the connection of a bound provider instance (VALIDATE_CONNECTION; the outcome is on the operation)
+      x-iam-phase: 3
+      x-iam-permission: account:discover
+      parameters:
+      - *id009
+      - *id010
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '202':
+          description: Accepted
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationSubmitted'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartDiscovery'
   /api/v1/targets/{id}/provider-bindings:
     get:
       tags:

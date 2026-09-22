@@ -98,7 +98,7 @@ export const NAVIGATION: NavItem[] = [
   },
 ];
 
-export const CURRENT_PHASE = 2;
+export const CURRENT_PHASE = 3;
 
 export function flatten(items: NavItem[] = NAVIGATION): NavItem[] {
   return items.flatMap((i) => [i, ...(i.children ? flatten(i.children) : [])]);
