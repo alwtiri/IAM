@@ -242,7 +242,7 @@ export function VaultPage() {
           {info && <Alert severity="info" onClose={() => setInfo(undefined)}>{info}</Alert>}
           {actionError !== undefined && <ErrorAlert error={actionError} />}
           {rows.length === 0 ? <Alert severity="info">{t.noVaulted}</Alert> : (
-            <DataTable<VaultedCredential> title={t.nav.passwordVault} rows={rows} rowKey={(v) => v.accountId} columns={[
+            <DataTable<VaultedCredential> hideTitle title={t.nav.passwordVault} rows={rows} rowKey={(v) => v.accountId} columns={[
               { header: t.name, cell: (v) => v.accountName },
               { header: t.server, cell: (v) => v.targetName },
               {

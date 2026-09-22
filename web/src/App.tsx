@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, MemoryRouter, Route, Routes } from 'react-router';
 import { Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
-import { DirectionalTheme } from './theme';
+import { ColorModeContext, type ColorMode, DirectionalTheme } from './theme';
 import { directionOf, messages, type Locale } from './i18n/messages';
 import { LocaleContext } from './i18n/LocaleContext';
 import { ApiError, apiFetch, startLogin } from './api/client';
@@ -56,6 +56,27 @@ function routeElement(item: NavItem) {
 
 export function App({ initialLocale = 'en', inMemoryRouter = false }: { initialLocale?: Locale; inMemoryRouter?: boolean }) {
   const [locale, setLocale] = useState<Locale>(initialLocale);
+  const [mode, setMode] = useState<ColorMode>(() => {
+    try {
+      const saved = window.localStorage.getItem('iam.colorMode');
+      if (saved === 'light' || saved === 'dark') return saved;
+      return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch {
+      return 'light';
+    }
+  });
+  const colorMode = useMemo(() => ({
+    mode,
+    toggle: () => setMode((m) => {
+      const next = m === 'light' ? 'dark' : 'light';
+      try {
+        window.localStorage.setItem('iam.colorMode', next);
+      } catch {
+        // preference is per browser only
+      }
+      return next;
+    }),
+  }), [mode]);
   const [me, setMe] = useState<EffectiveAccess>();
   const [error, setError] = useState<unknown>();
   const t = messages[locale];
@@ -99,9 +120,11 @@ export function App({ initialLocale = 'en', inMemoryRouter = false }: { initialL
 
   return (
     <LocaleContext.Provider value={ctx}>
-      <DirectionalTheme direction={direction}>
-        <Router>{content}</Router>
-      </DirectionalTheme>
+      <ColorModeContext.Provider value={colorMode}>
+        <DirectionalTheme direction={direction} mode={mode}>
+          <Router>{content}</Router>
+        </DirectionalTheme>
+      </ColorModeContext.Provider>
     </LocaleContext.Provider>
   );
 }
