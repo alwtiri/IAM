@@ -161,6 +161,25 @@ services:
     mem_limit: 128m
     restart: unless-stopped
 
+  # PostgreSQL target for the postgresql provider: docker compose --profile lab up -d lab-postgres
+  # In the UI: Assets > Databases > host lab-postgres, database labdb, user iam_service,
+  # password = secrets/lab_pg_service_password, TLS: choose "disable (lab only)" (this lab image has no TLS).
+  lab-postgres:
+    <<: *logging
+    profiles: [lab]
+    image: postgres:16.4-alpine
+    hostname: lab-postgres
+    environment:
+      POSTGRES_DB: labdb
+      POSTGRES_USER: labadmin
+      POSTGRES_PASSWORD_FILE: /run/secrets/lab_pg_admin_password
+    secrets: [lab_pg_admin_password, lab_pg_service_password]
+    volumes:
+      - ./lab/postgres/10-lab-roles.sh:/docker-entrypoint-initdb.d/10-lab-roles.sh:ro
+    networks: [core]
+    mem_limit: 256m
+    restart: unless-stopped
+
   # ------------------------------------------------------------------ core dependencies
   postgres:
     <<: [*hardening, *logging]
@@ -342,6 +361,8 @@ secrets:
   cache_password:          { file: ./secrets/cache_password }
   keycloak_client_secret:  { file: ./secrets/keycloak_client_secret }
   keycloak_admin_client_secret: { file: ./secrets/keycloak_admin_client_secret }
+  lab_pg_admin_password:   { file: ./secrets/lab_pg_admin_password }
+  lab_pg_service_password: { file: ./secrets/lab_pg_service_password }
   iam_admin_initial_password: { file: ./secrets/iam_admin_initial_password }
   vault_role_id:           { file: ./secrets/vault_role_id }
   vault_secret_id:         { file: ./secrets/vault_secret_id }

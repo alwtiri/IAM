@@ -18,7 +18,7 @@ random_secret() {
 
 for name in pg_superuser_password iam_owner_password iam_app_password iam_readonly_password \
             keycloak_db_password keycloak_admin_password keycloak_client_secret keycloak_admin_client_secret iam_admin_initial_password \
-            rabbitmq_password cache_password; do
+            rabbitmq_password cache_password lab_pg_admin_password lab_pg_service_password; do
   if [[ ! -s "secrets/$name" ]]; then
     printf '%s' "$(random_secret)" > "secrets/$name"
     echo "created secrets/$name"

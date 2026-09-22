@@ -357,6 +357,7 @@ function PostgresConnectDialog({ server, onClose, onConnected }: { server: Targe
     setSaving(true);
     try {
       const settings: Record<string, string> = { username: form.username, sslMode: form.sslMode };
+      if (form.sslMode === 'disable') settings.allowInsecure = 'true';
       if (form.caCertificatePem.trim()) settings.caCertificatePem = form.caCertificatePem.trim();
       const instance = await apiFetch<ProviderInstance>('/api/v1/provider-instances', {
         method: 'POST',
@@ -388,6 +389,7 @@ function PostgresConnectDialog({ server, onClose, onConnected }: { server: Targe
             <MenuItem value="verify-full">verify-full</MenuItem>
             <MenuItem value="verify-ca">verify-ca</MenuItem>
             <MenuItem value="require">require</MenuItem>
+            <MenuItem value="disable">disable ({t.labOnly})</MenuItem>
           </TextField>
           <TextField label={t.caCertificate} value={form.caCertificatePem} onChange={set('caCertificatePem')} multiline minRows={3} />
         </Stack>
