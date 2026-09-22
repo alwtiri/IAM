@@ -8,13 +8,16 @@ import { ApiError, apiFetch, startLogin } from './api/client';
 import type { EffectiveAccess } from './api/types';
 import { Shell } from './layout/Shell';
 import { flatten, isAvailable, type NavItem } from './navigation';
-import { AuditPage, HealthPage, PlannedPage, ProvidersPage, RolesPage, TargetsPage, UsersPage } from './pages/Pages';
+import { AuditPage, HealthPage, PlannedPage, ProvidersPage, RolesPage, TargetsPage } from './pages/Pages';
+import { UsersPage } from './pages/Users';
+import { DashboardPage } from './pages/Dashboard';
+import { MeContext } from './MeContext';
 import { ErrorAlert } from './pages/common';
 import { ServersPage } from './pages/Servers';
 import { AllAccountsPage, LinuxAccountsPage, PrivilegedAccountsPage, WindowsAccountsPage } from './pages/Accounts';
 
 const PAGES: Record<string, () => React.JSX.Element> = {
-  dashboard: HealthPage,
+  dashboard: DashboardPage,
   systemHealth: HealthPage,
   users: UsersPage,
   roles: RolesPage,
@@ -66,12 +69,14 @@ export function App({ initialLocale = 'en', inMemoryRouter = false }: { initialL
     );
   } else {
     content = (
-      <Shell me={me}>
-        <Routes>
-          {flatten().filter((i) => !i.children).map((i) => <Route key={i.id} path={i.path} element={routeElement(i)} />)}
-          <Route path="*" element={<HealthPage />} />
-        </Routes>
-      </Shell>
+      <MeContext.Provider value={me}>
+        <Shell me={me}>
+          <Routes>
+            {flatten().filter((i) => !i.children).map((i) => <Route key={i.id} path={i.path} element={routeElement(i)} />)}
+            <Route path="*" element={<DashboardPage />} />
+          </Routes>
+        </Shell>
+      </MeContext.Provider>
     );
   }
 

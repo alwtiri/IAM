@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Chip, CircularProgress, Stack, Typography } from '@mui/material';
 import { apiFetch } from '../api/client';
-import type { AuditEvent, Identity, ProviderInstance, Role, SystemHealth, Target } from '../api/types';
+import type { AuditEvent, ProviderInstance, Role, SystemHealth, Target } from '../api/types';
 import { useLocale } from '../i18n/LocaleContext';
 import { format } from '../i18n/messages';
 import type { NavItem } from '../navigation';
@@ -33,18 +33,6 @@ export function HealthPage() {
         { header: t.affected, cell: (c) => [c.reason, ...c.affectedFunctionality].filter(Boolean).join(' — ') },
       ]} />
     </Stack>
-  );
-}
-
-export function UsersPage() {
-  const { t } = useLocale();
-  return (
-    <PagedView<Identity> path="/api/v1/identities" title={t.nav.users} rowKey={(i) => i.id} columns={[
-      { header: t.name, cell: (i) => i.displayName },
-      { header: t.username, cell: (i) => i.username },
-      { header: t.type, cell: (i) => i.type },
-      { header: t.state, cell: (i) => <Chip size="small" label={i.state} color={statusColor(i.state)} /> },
-    ]} />
   );
 }
 

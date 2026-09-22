@@ -117,6 +117,8 @@ export interface Operation {
   errorMessage: string | null;
   verificationSummary: string | null;
   finishedAt: string | null;
+  createdAt?: string;
+  targetId?: string | null;
 }
 
 export interface DiscoveryRun {
