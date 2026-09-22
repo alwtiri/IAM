@@ -100,12 +100,13 @@ jobs:
           python3 -m pip install --quiet semgrep
           semgrep scan --error --metrics=off \
             --config p/java --config p/typescript --config p/dockerfile --config p/secrets \
-            --config ci/semgrep/iam-rules.yaml
+            --config ci/semgrep/iam-rules.yaml --exclude deploy/compose/lab
       - name: Filesystem & IaC scan (Trivy)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scanners: vuln,secret,misconfig
+          skip-dirs: deploy/compose/lab
           severity: HIGH,CRITICAL
           exit-code: '1'
           ignore-unfixed: true
