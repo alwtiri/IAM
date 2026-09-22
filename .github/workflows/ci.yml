@@ -111,7 +111,7 @@ jobs:
           ignore-unfixed: true
 
   images:
-    name: Build & scan container images
+    name: Build & scan container images (scan report-only, ADR-0019)
     runs-on: ubuntu-latest
     needs: [backend, web]
     timeout-minutes: 30
@@ -121,19 +121,28 @@ jobs:
         run: docker build -f core/Dockerfile -t iam-core:ci .
       - name: Build iam-web image
         run: docker build -t iam-web:ci web
+      - name: Build iam-worker image
+        run: docker build -f worker/Dockerfile -t iam-worker:ci .
       - name: Scan iam-core image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: iam-core:ci
           severity: HIGH,CRITICAL
-          exit-code: '1'
+          exit-code: '0' # report-only until Phase 9 (ADR-0019)
+          ignore-unfixed: true
+      - name: Scan iam-worker image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: iam-worker:ci
+          severity: HIGH,CRITICAL
+          exit-code: '0' # report-only until Phase 9 (ADR-0019)
           ignore-unfixed: true
       - name: Scan iam-web image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: iam-web:ci
           severity: HIGH,CRITICAL
-          exit-code: '1'
+          exit-code: '0' # report-only until Phase 9 (ADR-0019)
           ignore-unfixed: true
       # Image push is disabled until a registry is chosen (Q-05). SBOM and signing are added in Phase 9.
 

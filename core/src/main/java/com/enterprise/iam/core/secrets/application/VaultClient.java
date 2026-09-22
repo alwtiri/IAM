@@ -84,6 +84,21 @@ public class VaultClient {
         }
     }
 
+    /**
+     * Reads one version of a KV v2 secret written by {@link #writeKv}. Used only for credential-handle redemption; the
+     * value is handed to the worker and never logged or cached.
+     */
+    public Secret readKv(String path, long version) {
+        requirePath(path);
+        HttpResponse<String> r = send("GET", "/v1/" + kvMount + "/data/" + path + "?version=" + version, null, true);
+        expect2xx(r, "read");
+        Object value = Json.path(Json.parseObject(r.body()), "data", "data", "value");
+        if (!(value instanceof String v)) {
+            throw IamException.secretsUnavailable(null);
+        }
+        return Secret.of(v);
+    }
+
     /** Destroys all versions and metadata of a KV v2 path. Missing paths are treated as already destroyed. */
     public void destroyKv(String path) {
         requirePath(path);

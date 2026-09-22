@@ -6,7 +6,7 @@
 | Date | 2026-09-22 |
 | Authorization | Phase 1 gate approved by the owner on 2026-09-21 with condition C1 open |
 | Design | [PHASE-2-DESIGN.md](PHASE-2-DESIGN.md) · ADR-0015 (JdbcClient persistence) · ADR-0016 (BFF authentication and bootstrap) |
-| Status | **Submitted for gate approval — Phase 3 not started** |
+| Status | **Submitted for gate approval. C2 runtime checks complete (27/27 on the owner's server, §6.1); the backend build on PR #6 (test-compile fix) is the last CI item; Security scans are now green. Phase 3 not started** |
 | Decision requested | Approve Phase 2 subject to condition **C2** (§6) and authorize Phase 3 — Core Providers |
 
 ---
@@ -17,7 +17,7 @@
 |---|---|
 | Local run on the owner's server (`registry`, 192.168.136.139) | **Met.** All 10 containers are healthy. Flyway applied V1 into schema `platform`, and `iam-core` (Spring Boot 4) started in 1.5 s. |
 | Defects found by the first run, all fixed | (1) Gradle had no Maven repositories configured. (2) The dev-secret generator stopped after the first file (SIGPIPE under `pipefail`). (3) Flyway tried to create its history table in `public`, which is closed for object creation. |
-| Green CI run on GitHub | **Open.** The workflow has not run yet because the repository has not been pushed. This is carried into C2. |
+| Green CI run on GitHub | **Open** (see §6.1). The repository is on GitHub (PR #1, #2, #5 merged into `main`). On PR #6, Web, Contracts, and Security scans are green; the backend test-compile defect is fixed and awaiting CI. |
 
 ## 2. What Phase 2 delivers
 
@@ -101,6 +101,23 @@ The Phase 1 run on the owner's server already confirmed a good share of the Phas
    - Registering a provider instance stores its credential in Vault; stopping Vault makes that call return 503 `SECRETS_UNAVAILABLE` while identities stay readable.
    - The e-mail for the role grant is visible in Mailpit.
 4. **Fixes.** Any compile or runtime defect found is fixed within Phase 2 before Phase 3 starts.
+
+### 6.1 C2 status (2026-09-22)
+
+| C2 item | Result | Evidence |
+|---|---|---|
+| 1. Build and tests | **Open: fix pending CI.** PR #6 showed that `PostgresMigrationIT` did not compile, because the PostgreSQL driver is runtime-only while the test imported `PGSimpleDataSource`. The test now uses Spring's `DriverManagerDataSource`. An earlier reading of PR #1 as green was wrong: the backend job cannot have compiled this test. `ci/local-build.sh` now reproduces the CI build locally. | PR #6 job log |
+| 2. Stack and migrations | **Met.** All services are healthy and V1–V8 are applied. The System Health page shows 6/6 components HEALTHY. | Owner's server `registry` |
+| 3. Smoke test | **Met: 23/23 PASS** with `deploy/compose/scripts/smoke-phase2.sh` (run `SMOKE-1790030712`). Covers login and bootstrap; org unit, person, and identity with activation; scoped HELPDESK grant with step-up, duplicate rejected (409), and revoke; 404 for unknown objects, 400 validation, 403 without CSRF, 401 without session, actuator hidden; provider credential stored only in Vault (not in the response, GET, or logs) and secret-looking setting keys rejected; audit list, chain valid, DB UPDATE blocked; lifecycle e-mail in Mailpit. | Server console output |
+| 3a. Vault outage (503 `SECRETS_UNAVAILABLE`, identities still readable) | **Met: 4/4 PASS** with `smoke-phase2.sh --vault-down` (run `SMOKE-1790039381`, 27/27 overall). With Vault stopped, the non-secret API answers 200, provider registration returns 503 `SECRETS_UNAVAILABLE`, and health reports vault UNAVAILABLE. Vault then restarted and unsealed cleanly. | Server console output |
+| 4. Defects fixed within Phase 2 | **Met.** See the list below. | Commits on `main` and `phase-2-closeout` |
+
+Defects found and fixed during C2:
+
+1. **Web and Core error handling.** Non-JSON error pages broke the UI ("Unexpected token '<'"). The web client now reports HTTP errors, and Core permits `/error` and disables the whitelabel page.
+2. **Step-up never satisfied.** Keycloak's `amr` mapper emits nothing unless the authenticator executions carry an Authentication Reference. `scripts/keycloak-stepup-dev.sh` now copies the browser flow and tags password as `pwd` and OTP as `otp`, with WebAuthn tagged `hwk`. The script also had a bug of its own: `docker exec` consumed the loop's stdin, so only the first execution was tagged.
+3. **CI Security scans.** The `trivy-action@0.28.0` tag no longer resolves, so the action is now pinned to v0.36.0 by commit SHA. Semgrep then reported unpinned base images, and all four are now pinned by digest (ADR-0017). It also flagged plain sockets in the internal health probes; these are annotated, with TLS tracked for Phase 10.
+4. **Process.** Owner directive: local-first Git workflow ([GIT-WORKFLOW-POLICY](../process/GIT-WORKFLOW-POLICY.md), ADR-0017). `ci/local-checks.sh` runs the checks locally, and a git bundle that was committed to `main` by upload is removed.
 
 **Deviations recorded:**
 

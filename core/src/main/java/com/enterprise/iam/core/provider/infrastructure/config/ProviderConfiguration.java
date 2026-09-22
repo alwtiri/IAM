@@ -1,5 +1,6 @@
 package com.enterprise.iam.core.provider.infrastructure.config;
 
+import com.enterprise.iam.core.target.api.TargetDirectory;
 import com.enterprise.iam.core.audit.api.AuditRecorder;
 import com.enterprise.iam.core.provider.application.ProviderRegistryService;
 import com.enterprise.iam.core.provider.infrastructure.persistence.JdbcProviderStore;
@@ -16,7 +17,7 @@ class ProviderConfiguration {
 
     @Bean
     ProviderRegistryService providerRegistryService(JdbcClient jdbc, SecretStore secrets, AccessGuard guard, AuditRecorder audit,
-                                                    TransactionRunner tx, Clock clock) {
-        return new ProviderRegistryService(new JdbcProviderStore(jdbc), secrets, guard, audit, tx, clock);
+                                                    TransactionRunner tx, Clock clock, TargetDirectory targets) {
+        return new ProviderRegistryService(new JdbcProviderStore(jdbc), secrets, guard, audit, tx, clock, targets);
     }
 }

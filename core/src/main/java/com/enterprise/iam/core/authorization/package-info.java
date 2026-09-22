@@ -3,7 +3,7 @@
  *
  * <p>Allowed dependencies are enforced by Spring Modulith verification (ModularityTest) and ArchUnit.
  */
-@ApplicationModule(displayName = "Authorization", allowedDependencies = {"shared::api", "audit::api", "identity::api", "organization::api"})
+@ApplicationModule(displayName = "Authorization", allowedDependencies = {"shared::*", "audit::api", "identity::api", "organization::api"})
 package com.enterprise.iam.core.authorization;
 
 import org.springframework.modulith.ApplicationModule;

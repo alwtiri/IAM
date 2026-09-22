@@ -15,7 +15,7 @@
 | `provider-spi-testkit` | test library (JUnit 5) | `provider-spi` | core |
 | `core` | Spring Boot application `iam-core` | `shared-kernel`, `provider-spi` (types only: capability model, result types) | `providers/*`, `gateways/*`, `worker`, `agent`, `integrations/*` |
 | `worker` (Phase 3) | Spring Boot application | `shared-kernel`, `provider-spi`, `providers/*` (runtime classpath) | `core` internals |
-| `providers/<type>` (Phase 3+) | plain Java libraries | `provider-spi` | `core`, other providers |
+| `providers/<type>` (Phase 3+) | plain Java libraries | `provider-spi`, `shared-kernel`, their protocol library (ADR-0018) | `core`, `worker`, other providers, Spring |
 | `gateways/<channel>` (Phase 6) | applications | `shared-kernel`, generated internal API client | `core` internals |
 
 ## 2. `core` application modules
@@ -45,7 +45,7 @@ Base package `com.enterprise.iam.core`. Each direct sub-package is a module. Onl
 | `search` | read-only query APIs of any module |
 | `health` | shared (checks are contributed by modules via `shared.api.health.ComponentHealthCheck` — Phase 2) |
 
-Cycles are forbidden. Cross-cutting security contracts (`CurrentActor`, `AccessGuard`, `ResourceScope`, `ScopeFilter`, `Permissions`, `BootstrapAdministratorGrant`) live in `shared.api.security` and are implemented by the authorization and identity modules (dependency inversion, PHASE-2-DESIGN §3.2). Reactions flowing "upward" (e.g. `approval` completing a `request`) use domain events, not direct calls.
+Modules reference the shared kernel as `shared::*`, meaning any explicitly exposed named interface of `shared`. The reason is that `shared.api` is split into sub-packages (`security`, `paging`, `tx`, `jdbc`, `health`, `events`, `context`), each annotated `@NamedInterface("api")`. Spring Modulith 2.0 does not merge same-named interfaces declared on several packages, so `shared::api` resolved to only one of them. `shared.infrastructure` stays inaccessible because it is not a named interface. Cycles are forbidden. Cross-cutting security contracts (`CurrentActor`, `AccessGuard`, `ResourceScope`, `ScopeFilter`, `Permissions`, `BootstrapAdministratorGrant`) live in `shared.api.security` and are implemented by the authorization and identity modules (dependency inversion, PHASE-2-DESIGN §3.2). Reactions flowing "upward" (e.g. `approval` completing a `request`) use domain events, not direct calls.
 
 ## 3. Rules enforced by tests
 

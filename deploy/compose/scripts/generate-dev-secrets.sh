@@ -36,3 +36,6 @@ for name in vault_role_id vault_secret_id; do
   [[ -s "secrets/$name" ]] || { printf 'uninitialized' > "secrets/$name"; echo "created secrets/$name (placeholder)"; }
   chmod 644 "secrets/$name"
 done
+
+# Internal mTLS PKI for the worker plane (Phase 3)
+"$(dirname "$0")/pki-dev.sh"

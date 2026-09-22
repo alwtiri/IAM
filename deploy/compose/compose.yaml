@@ -6,8 +6,8 @@
 #   docker compose up -d --build
 #   ./scripts/vault-init-dev.sh            # once per fresh vault volume (dev only)
 #
-# Later-phase services (worker pools, scheduler, gateways, integrations, object store) are added in
-# separate compose files in their phases. They are intentionally NOT declared here (gate clarification G10).
+# Services are added in the phase that implements them (gate clarification G10): iam-worker from Phase 3;
+# scheduler, gateways, integrations and object store in their phases.
 # Image tags are pinned to exact versions; digest pinning is automated in Phase 9.
 # =====================================================================
 name: iam
@@ -83,6 +83,8 @@ services:
       IAM_BOOTSTRAP_ADMIN_SUBJECT: ${IAM_BOOTSTRAP_ADMIN_SUBJECT:-4f0a6d3e-8c1b-4d2a-9e5f-1a2b3c4d5e6f}
       SPRING_MAIL_HOST: mailpit
       SPRING_MAIL_PORT: "1025"
+      # Internal mTLS listener on 8443 (core network only, never published) for worker credential-handle redemption.
+      IAM_INTERNAL_API_ENABLED: "true"
     # Secret values are read from /run/secrets via Spring's configtree (file name = property name).
     secrets:
       - source: iam_app_password
@@ -99,6 +101,12 @@ services:
         target: vault_secret_id
       - source: cache_password
         target: cache_password
+      - source: pki_ca_crt
+        target: pki_ca_crt
+      - source: pki_core_crt
+        target: pki_core_crt
+      - source: pki_core_key
+        target: pki_core_key
     depends_on:
       postgres: { condition: service_healthy }
     networks: [edge, core]
@@ -109,6 +117,32 @@ services:
       timeout: 5s
       start_period: 90s
       retries: 5
+
+  # ------------------------------------------------------------------ worker plane (Phase 3)
+  iam-worker:
+    <<: [*hardening, *logging]
+    build: { context: ../.., dockerfile: worker/Dockerfile }
+    image: iam-worker:dev
+    user: "10001:10001"
+    environment:
+      # Provider types served by this worker (one queue each, G4). Split into several workers per pool in production.
+      IAM_WORKER_POOLS: linux-ssh,active-directory,windows-winrm,generic-rest
+      IAM_CORE_INTERNAL_URL: https://iam-core:8443
+    secrets:
+      - source: rabbitmq_password
+        target: spring.rabbitmq.password
+      - source: pki_ca_crt
+        target: pki_ca_crt
+      - source: pki_worker_crt
+        target: pki_worker_crt
+      - source: pki_worker_key
+        target: pki_worker_key
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      iam-core: { condition: service_healthy }
+    # No database access. Reaches RabbitMQ and the Core on the core network and managed targets via egress.
+    networks: [core]
+    mem_limit: 768m
 
   # ------------------------------------------------------------------ core dependencies
   postgres:
@@ -292,3 +326,8 @@ secrets:
   iam_admin_initial_password: { file: ./secrets/iam_admin_initial_password }
   vault_role_id:           { file: ./secrets/vault_role_id }
   vault_secret_id:         { file: ./secrets/vault_secret_id }
+  pki_ca_crt:              { file: ./secrets/pki_ca_crt }
+  pki_core_crt:            { file: ./secrets/pki_core_crt }
+  pki_core_key:            { file: ./secrets/pki_core_key }
+  pki_worker_crt:          { file: ./secrets/pki_worker_crt }
+  pki_worker_key:          { file: ./secrets/pki_worker_key }

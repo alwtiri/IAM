@@ -18,3 +18,6 @@ Format: Context / Decision / Consequences. Numbered sequentially, never renumber
 - [ADR-0014: Spring Boot 4.0 / Spring Framework 7 as backend baseline](ADR-0014-spring-boot-4-baseline.md)
 - [ADR-0015: Persistence with Spring JdbcClient and explicit SQL](ADR-0015-persistence-spring-jdbcclient.md)
 - [ADR-0016: BFF authentication, actor resolution, and one-time platform bootstrap](ADR-0016-bff-authentication-and-bootstrap.md)
+- [ADR-0017: Local-first development workflow with checkpoint-based remote synchronization](ADR-0017-local-first-development-workflow.md)
+- [ADR-0018: Provider and worker libraries](ADR-0018-provider-and-worker-libraries.md)
+- [ADR-0019: Container image vulnerability scan is report-only until Phase 9](ADR-0019-image-scan-report-only-until-phase-9.md)

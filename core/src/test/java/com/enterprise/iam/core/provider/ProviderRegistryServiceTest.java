@@ -53,6 +53,26 @@ class ProviderRegistryServiceTest {
         }
 
         @Override
+        public boolean bind(UUID targetId, UUID providerInstanceId, String channel) {
+            return true;
+        }
+
+        @Override
+        public boolean unbind(UUID targetId, UUID providerInstanceId) {
+            return true;
+        }
+
+        @Override
+        public List<com.enterprise.iam.core.provider.api.ProviderBindingView> bindings(UUID targetId) {
+            return List.of();
+        }
+
+        @Override
+        public boolean isBound(UUID targetId, UUID providerInstanceId) {
+            return false;
+        }
+
+        @Override
         public Optional<ProviderInstanceView> view(UUID id) {
             return find(id).map(p -> new ProviderInstanceView(p.id(), p.type().value(), p.name(), p.endpoint(), p.settings(),
                     p.credentialSecretRef() != null, p.enabled(), "UNKNOWN", "CLOSED", null, null, p.version()));
@@ -81,6 +101,14 @@ class ProviderRegistryServiceTest {
             }
             written.add(path);
             return SecretRef.of("iam", path, 1);
+        }
+
+        @Override
+        public Secret read(SecretRef ref) {
+            if (down) {
+                throw IamException.secretsUnavailable(null);
+            }
+            return Secret.of("pw");
         }
 
         @Override

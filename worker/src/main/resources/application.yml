@@ -1,0 +1,58 @@
+# iam-worker (PHASE-3-DESIGN §3). Secrets come from /run/secrets via configtree (file name = property name).
+spring:
+  application:
+    name: iam-worker
+  config:
+    import: optional:configtree:/run/secrets/
+  main:
+    banner-mode: off
+  threads:
+    virtual:
+      enabled: true
+  rabbitmq:
+    host: ${IAM_RABBITMQ_HOST:rabbitmq}
+    port: ${IAM_RABBITMQ_PORT:5672}
+    username: ${IAM_RABBITMQ_USER:iam}
+    virtual-host: ${IAM_RABBITMQ_VHOST:iam}
+    # password: /run/secrets/spring.rabbitmq.password
+    connection-timeout: 3s
+    publisher-confirm-type: simple
+
+server:
+  port: ${IAM_WORKER_HTTP_PORT:8081}
+  shutdown: graceful
+
+iam:
+  worker:
+    instance: ${IAM_WORKER_INSTANCE:}
+    pools: ${IAM_WORKER_POOLS:linux-ssh,active-directory,windows-winrm,generic-rest}
+    default-concurrency: 4
+    concurrency:
+      linux-ssh: 8
+      active-directory: 4
+      windows-winrm: 4
+      generic-rest: 4
+    bulkhead: 4
+    core-internal-url: ${IAM_CORE_INTERNAL_URL:https://iam-core:8443}
+    cert-file: /run/secrets/pki_worker_crt
+    key-file: /run/secrets/pki_worker_key
+    ca-file: /run/secrets/pki_ca_crt
+    retry-backoff: PT2S
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    rabbit:
+      enabled: true
+
+logging:
+  level:
+    root: INFO

@@ -63,9 +63,15 @@ npx @redocly/cli lint contracts/openapi/iam-core-v1.yaml
 `docker compose down` keeps data. `docker compose down -v` deletes **all** data (database, Vault, Keycloak) — only for
 development, and Vault must then be initialised again.
 
-## Pushing changes
+## Git workflow (local-first, ADR-0017)
 
-`./scripts/git-push.sh "message" [branch]` stages everything, aborts if a secret file (`deploy/compose/secrets/*`, `.env`, keys, `vault-dev-init.json`) is staged, commits, pushes the branch, and prints the pull-request link. Direct pushes to `main` are refused unless `ALLOW_MAIN=1`.
+The normative policy is [process/GIT-WORKFLOW-POLICY.md](process/GIT-WORKFLOW-POLICY.md). In short:
+
+1. Work on a branch; build and test locally with `./ci/local-build.sh`: the same `./gradlew build` as CI, inside the pinned JDK image, with Testcontainers support. Run `./ci/local-checks.sh` before committing: project Semgrep rules, contract/enum sync, compose policy, and shellcheck. The registry Semgrep packs, Gitleaks, and Trivy also run when installed.
+2. Commit locally with meaningful messages. There is no push after every commit.
+3. At a checkpoint (phase gate, milestone, before a risky change) push once with `./scripts/git-push.sh "message" [branch]`. It shows branch and status, blocks secret files, commits, pushes, and prints the PR link. Direct pushes to `main` are refused unless `ALLOW_MAIN=1`.
+4. CI validates the PR; it is not the everyday feedback loop.
+5. `reset --hard`, `clean -fd`, force-push, `rebase`, and `branch -D` are never used without the owner's explicit approval.
 
 ## Phase 2 smoke test (gate condition C2)
 

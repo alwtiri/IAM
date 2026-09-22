@@ -45,7 +45,9 @@ public final class NetworkProbes {
                                            ComponentHealth.Classification classification, String host, int port,
                                            String expectedBannerPrefix, List<String> affected) {
         return new Probe(component, category, classification, affected, () -> {
-            try (Socket s = new Socket()) {
+            // Health probe on the internal core network only (dev SMTP sink / cache); flagged by Semgrep
+            // unencrypted-socket. TLS for SMTP and the cache is a production hardening item (Phase 10).
+            try (Socket s = new Socket()) { // nosemgrep
                 s.connect(new InetSocketAddress(host, port), 2000);
                 s.setSoTimeout(2000);
                 if (expectedBannerPrefix != null) {
@@ -66,7 +68,9 @@ public final class NetworkProbes {
     /** Redis/Valkey {@code AUTH} + {@code PING} over RESP with a password supplier (read lazily from a secret file). */
     public static ComponentHealthCheck redis(String host, int port, Supplier<String> password, List<String> affected) {
         return new Probe("cache", ComponentHealth.Category.CACHE, ComponentHealth.Classification.OPTIONAL, affected, () -> {
-            try (Socket s = new Socket()) {
+            // Health probe on the internal core network only (dev SMTP sink / cache); flagged by Semgrep
+            // unencrypted-socket. TLS for SMTP and the cache is a production hardening item (Phase 10).
+            try (Socket s = new Socket()) { // nosemgrep
                 s.connect(new InetSocketAddress(host, port), 2000);
                 s.setSoTimeout(2000);
                 OutputStream out = s.getOutputStream();

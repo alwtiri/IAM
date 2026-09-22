@@ -14,6 +14,9 @@ public interface SecretStore {
      */
     SecretRef write(String logicalPath, Secret value);
 
+    /** Reads the exact version a reference points to. Callers must destroy the returned secret after use. */
+    Secret read(SecretRef ref);
+
     /** Permanently destroys all versions at the reference's path (compensation / decommissioning). */
     void destroy(SecretRef ref);
 }

@@ -5,45 +5,162 @@
   "description": "Message published by worker pools to exchange iam.ops.results. The Core consumer is idempotent on messageId and updates the Operation; workers never write the platform database.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "messageId", "operationId", "attempt", "outcome", "workerInstance", "correlationId", "completedAt"],
+  "required": [
+    "schemaVersion",
+    "messageId",
+    "operationId",
+    "attempt",
+    "outcome",
+    "workerInstance",
+    "correlationId",
+    "completedAt"
+  ],
   "properties": {
-    "schemaVersion": { "const": 1 },
-    "messageId": { "type": "string", "format": "uuid" },
-    "operationId": { "type": "string", "format": "uuid" },
-    "attempt": { "type": "integer", "minimum": 1 },
-    "outcome": { "type": "string", "enum": ["SUCCEEDED", "FAILED", "PARTIAL", "TIMEOUT", "UNKNOWN", "UNSUPPORTED"] },
+    "schemaVersion": {
+      "const": 1
+    },
+    "messageId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "operationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "SUCCEEDED",
+        "FAILED",
+        "PARTIAL",
+        "TIMEOUT",
+        "UNKNOWN",
+        "UNSUPPORTED",
+        "PROGRESS"
+      ],
+      "description": "PROGRESS carries one page of a paged operation (e.g. discovery) and keeps the operation RUNNING; the final message has another outcome."
+    },
     "verification": {
-      "type": ["object", "null"],
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": false,
-      "required": ["mode", "verifiedAt", "summary"],
+      "required": [
+        "mode",
+        "verifiedAt",
+        "summary"
+      ],
       "properties": {
-        "mode": { "type": "string", "enum": ["READ_BACK", "LOGIN_TEST", "TARGET_CONFIRMATION"] },
-        "verifiedAt": { "type": "string", "format": "date-time" },
-        "summary": { "type": "string", "maxLength": 512 }
+        "mode": {
+          "type": "string",
+          "enum": [
+            "READ_BACK",
+            "LOGIN_TEST",
+            "TARGET_CONFIRMATION"
+          ]
+        },
+        "verifiedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 512
+        }
       }
     },
     "error": {
-      "type": ["object", "null"],
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": false,
-      "required": ["code", "message", "retryable", "changeMayHaveApplied"],
+      "required": [
+        "code",
+        "message",
+        "retryable",
+        "changeMayHaveApplied"
+      ],
       "properties": {
-        "code": { "type": "string" },
-        "message": { "type": "string", "maxLength": 1000 },
-        "retryable": { "type": "boolean" },
-        "changeMayHaveApplied": { "type": "boolean" }
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "changeMayHaveApplied": {
+          "type": "boolean"
+        }
       }
     },
-    "details": { "type": "array", "items": { "type": "string" } },
-    "resultPayload": { "type": ["object", "null"], "description": "Non-secret result data (observed account state, discovery page reference, drift list)." },
-    "workerInstance": { "type": "string" },
-    "correlationId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{8,64}$" },
-    "completedAt": { "type": "string", "format": "date-time" }
+    "details": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "resultPayload": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Non-secret result data: observed account state (accounts: [...]) for lifecycle operations, one discovery page (accounts/groups) for PROGRESS, totals for the final discovery message."
+    },
+    "workerInstance": {
+      "type": "string"
+    },
+    "correlationId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{8,64}$"
+    },
+    "completedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Page number of a PROGRESS message (0-based); absent otherwise."
+    }
   },
   "allOf": [
     {
-      "if": { "properties": { "outcome": { "const": "SUCCEEDED" } } },
-      "then": { "properties": { "error": { "type": "null" } } },
-      "else": { "required": ["error"], "properties": { "error": { "type": "object" } } }
+      "if": {
+        "properties": {
+          "outcome": {
+            "enum": [
+              "SUCCEEDED",
+              "PROGRESS"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "error": {
+            "type": "null"
+          }
+        }
+      },
+      "else": {
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object"
+          }
+        }
+      }
     }
   ]
 }

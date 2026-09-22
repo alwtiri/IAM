@@ -10,6 +10,7 @@ import com.enterprise.iam.core.audit.domain.ChainVerifier;
 import com.enterprise.iam.core.audit.infrastructure.persistence.JdbcAuditStore;
 import com.enterprise.iam.core.operation.api.OutboxMessage;
 import com.enterprise.iam.core.operation.infrastructure.persistence.JdbcOutboxStore;
+import com.enterprise.iam.core.shared.api.security.Permissions;
 import com.enterprise.iam.core.shared.api.tx.TransactionRunner;
 import com.enterprise.iam.core.testsupport.TestSupport;
 import java.time.Clock;
@@ -20,9 +21,9 @@ import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.postgresql.ds.PGSimpleDataSource;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -45,10 +46,8 @@ class PostgresMigrationIT {
     static void migrate() {
         Flyway.configure().dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
                 .defaultSchema("platform").createSchemas(true).locations("classpath:db/migration").load().migrate();
-        PGSimpleDataSource ds = new PGSimpleDataSource();
-        ds.setUrl(POSTGRES.getJdbcUrl());
-        ds.setUser(POSTGRES.getUsername());
-        ds.setPassword(POSTGRES.getPassword());
+        // Spring's DriverManagerDataSource keeps the PostgreSQL driver runtime-only (no compile dependency on org.postgresql).
+        DriverManagerDataSource ds = new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
         jdbc = JdbcClient.create(ds);
         TransactionTemplate tt = new TransactionTemplate(new DataSourceTransactionManager(ds));
         tx = new TransactionRunner() {
@@ -66,7 +65,9 @@ class PostgresMigrationIT {
 
     @Test
     void seedDataIsPresent() {
-        assertEquals(20L, jdbc.sql("SELECT count(*) FROM \"authorization\".permission").query(Long.class).single());
+        // The seeded catalog must equal the code catalog (grows with each phase; never a hard-coded count).
+        assertEquals(java.util.Set.copyOf(Permissions.ALL),
+                java.util.Set.copyOf(jdbc.sql("SELECT code FROM \"authorization\".permission").query(String.class).list()));
         assertEquals(11L, jdbc.sql("SELECT count(*) FROM \"authorization\".role WHERE built_in").query(Long.class).single());
         assertEquals("ACTIVE", jdbc.sql("SELECT state FROM identity.identity WHERE username = 'system'").query(String.class).single());
     }

@@ -2,7 +2,7 @@
 # iam-core image (ADR-0009). Build context: repository root.
 #   docker build -f core/Dockerfile -t iam-core:dev .
 
-FROM eclipse-temurin:21-jdk-noble AS build
+FROM eclipse-temurin:21-jdk-noble@sha256:4d271cd5e0624598cf563342f47281b09cb364bc13acbbd7251f49f83470018d AS build
 WORKDIR /workspace
 COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY gradle ./gradle
@@ -13,7 +13,7 @@ COPY core ./core
 RUN --mount=type=cache,target=/root/.gradle ./gradlew --no-daemon :core:bootJar -x test \
  && java -Djarmode=tools -jar core/build/libs/iam-core.jar extract --layers --launcher --destination /workspace/extracted
 
-FROM eclipse-temurin:21-jre-noble AS runtime
+FROM eclipse-temurin:21-jre-noble@sha256:7739f0ffce786528961eea6bf46d9610ee968ac6127c9b2e93494757bdecce9f AS runtime
 LABEL org.opencontainers.image.title="iam-core" \
       org.opencontainers.image.description="Enterprise IAM / PAM governance Core" \
       org.opencontainers.image.vendor="Enterprise IAM"

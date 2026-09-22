@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Enterprise IAM / PAM Platform — Core API
-  version: 1.0.0-phase2
+  version: 1.0.0-phase3
   summary: Public REST API of iam-core (contract-first, ADR-0012).
   description: 'Phase 1 foundation contract. It fixes the cross-cutting elements every endpoint uses
 
@@ -44,6 +44,8 @@ tags:
   description: Targets (spec §10)
 - name: providers
   description: Provider instances (spec §11)
+- name: accounts
+  description: Account Management Core (spec §12–§14, G8)
 paths:
   /api/v1/system/info:
     get:
@@ -1396,6 +1398,490 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProviderInstance'
+  /api/v1/accounts:
+    get:
+      tags:
+      - accounts
+      operationId: listAccounts
+      summary: List accounts (scope-filtered)
+      x-iam-phase: 3
+      x-iam-permission: account:read
+      parameters:
+      - &id005
+        $ref: '#/components/parameters/CorrelationId'
+      - name: targetId
+        in: query
+        required: false
+        schema: &id014
+          type: string
+          format: uuid
+      - name: governanceState
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/AccountGovernanceState'
+      - name: privileged
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      - name: findingType
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/AccountFindingType'
+      - &id007
+        $ref: '#/components/parameters/Limit'
+      - &id008
+        $ref: '#/components/parameters/Cursor'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountPage'
+  /api/v1/accounts/{id}:
+    get:
+      tags:
+      - accounts
+      operationId: getAccount
+      summary: Get an account
+      x-iam-phase: 3
+      x-iam-permission: account:read
+      parameters:
+      - *id005
+      - &id006
+        $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+  /api/v1/accounts/{id}/governance:
+    patch:
+      tags:
+      - accounts
+      operationId: changeAccountGovernance
+      summary: Change account type, owner, linked identity or governance state
+      x-iam-phase: 3
+      x-iam-permission: account:write
+      parameters:
+      - *id005
+      - *id006
+      - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountGovernanceChange'
+  /api/v1/account-findings:
+    get:
+      tags:
+      - accounts
+      operationId: listAccountFindings
+      summary: List account findings (scope-filtered)
+      x-iam-phase: 3
+      x-iam-permission: account:read
+      parameters:
+      - *id005
+      - name: type
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/AccountFindingType'
+      - name: severity
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/FindingSeverity'
+      - name: open
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+      - *id007
+      - *id008
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountFindingPage'
+  /api/v1/account-findings/{id}:resolve:
+    post:
+      tags:
+      - accounts
+      operationId: resolveAccountFinding
+      summary: Resolve a finding with a reason
+      x-iam-phase: 3
+      x-iam-permission: account:finding:resolve
+      parameters:
+      - *id005
+      - *id006
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountFinding'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FindingResolution'
+  /api/v1/targets/{id}/discovery-runs:
+    get:
+      tags:
+      - accounts
+      operationId: listDiscoveryRuns
+      summary: Recent discovery runs of a target
+      x-iam-phase: 3
+      x-iam-permission: account:read
+      parameters:
+      - *id005
+      - *id006
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DiscoveryRun'
+    post:
+      tags:
+      - accounts
+      operationId: startDiscovery
+      summary: Start read-only account discovery through a bound provider instance
+      x-iam-phase: 3
+      x-iam-permission: account:discover
+      parameters:
+      - &id009
+        $ref: '#/components/parameters/CorrelationId'
+      - &id010
+        $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '202':
+          description: Accepted
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationSubmitted'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartDiscovery'
+  /api/v1/targets/{id}/provider-bindings:
+    get:
+      tags:
+      - providers
+      operationId: listProviderBindings
+      summary: Provider instances bound to a target
+      x-iam-phase: 3
+      x-iam-permission: target:read
+      parameters:
+      - *id009
+      - *id010
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProviderBinding'
+    post:
+      tags:
+      - providers
+      operationId: bindProvider
+      summary: Bind a provider instance to a target (requires target:write on the target as well)
+      x-iam-phase: 3
+      x-iam-permission: provider:write
+      parameters:
+      - *id009
+      - *id010
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProviderBinding'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BindProvider'
+  /api/v1/targets/{id}/provider-bindings/{providerInstanceId}:
+    delete:
+      tags:
+      - providers
+      operationId: unbindProvider
+      summary: Remove a provider binding
+      x-iam-phase: 3
+      x-iam-permission: provider:write
+      parameters:
+      - *id009
+      - *id010
+      - name: providerInstanceId
+        in: path
+        required: true
+        schema: &id017
+          type: string
+          format: uuid
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProviderBinding'
+  /api/v1/accounts/{id}:enable:
+    post:
+      tags:
+      - accounts
+      operationId: enableAccount
+      summary: Enable the account on its target (verified)
+      x-iam-phase: 3
+      x-iam-permission: operation:execute
+      parameters:
+      - *id009
+      - *id010
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '202':
+          description: Accepted
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationSubmitted'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationReason'
+  /api/v1/accounts/{id}:disable:
+    post:
+      tags:
+      - accounts
+      operationId: disableAccount
+      summary: Disable the account on its target (verified)
+      x-iam-phase: 3
+      x-iam-permission: operation:execute
+      parameters:
+      - *id009
+      - *id010
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '202':
+          description: Accepted
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationSubmitted'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationReason'
+  /api/v1/accounts/{id}:unlock:
+    post:
+      tags:
+      - accounts
+      operationId: unlockAccount
+      summary: Unlock the account on its target (verified)
+      x-iam-phase: 3
+      x-iam-permission: operation:execute
+      parameters:
+      - *id009
+      - *id010
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '202':
+          description: Accepted
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationSubmitted'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationReason'
+  /api/v1/accounts/{id}:refresh:
+    post:
+      tags:
+      - accounts
+      operationId: refreshAccount
+      summary: Read the current account state from the target
+      x-iam-phase: 3
+      x-iam-permission: account:read
+      parameters:
+      - *id009
+      - *id010
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '202':
+          description: Accepted
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationSubmitted'
 components:
   securitySchemes:
     bffSession:
@@ -1806,7 +2292,7 @@ components:
       - version
       properties:
         id: *id003
-        parentId: &id005
+        parentId: &id011
           type:
           - string
           - 'null'
@@ -1845,7 +2331,7 @@ components:
       - code
       - name
       properties:
-        parentId: *id005
+        parentId: *id011
         kind:
           $ref: '#/components/schemas/OrgUnitKind'
         code:
@@ -1908,7 +2394,7 @@ components:
       - givenName
       - familyName
       properties:
-        orgUnitId: *id005
+        orgUnitId: *id011
         employeeId:
           type:
           - string
@@ -1925,9 +2411,9 @@ components:
           - string
           - 'null'
           maxLength: 200
-        positionId: *id005
-        locationId: *id005
-        managerPersonId: *id005
+        positionId: *id011
+        locationId: *id011
+        managerPersonId: *id011
         employmentStatus:
           $ref: '#/components/schemas/EmploymentStatus'
         startDate:
@@ -1961,7 +2447,7 @@ components:
       - version
       properties:
         id: *id003
-        orgUnitId: *id005
+        orgUnitId: *id011
         employeeId:
           type:
           - string
@@ -1972,9 +2458,9 @@ components:
           type: string
         displayName:
           type: string
-        positionId: *id005
-        locationId: *id005
-        managerPersonId: *id005
+        positionId: *id011
+        locationId: *id011
+        managerPersonId: *id011
         employmentStatus:
           $ref: '#/components/schemas/EmploymentStatus'
         startDate:
@@ -2046,7 +2532,7 @@ components:
         username:
           type: string
           pattern: ^[a-z0-9][a-z0-9._-]{2,63}$
-        validUntil: &id006
+        validUntil: &id012
           type:
           - string
           - 'null'
@@ -2078,7 +2564,7 @@ components:
           - string
           - 'null'
         validFrom: *id004
-        validUntil: *id006
+        validUntil: *id012
         platformUser:
           type: boolean
         version:
@@ -2184,8 +2670,8 @@ components:
           maxItems: 50
           items:
             $ref: '#/components/schemas/ScopeElement'
-        validFrom: *id006
-        validUntil: *id006
+        validFrom: *id012
+        validUntil: *id012
         reason:
           type:
           - string
@@ -2227,11 +2713,11 @@ components:
           - REVOKED
           - EXPIRED
         validFrom: *id004
-        validUntil: *id006
-        grantedBy: *id005
+        validUntil: *id012
+        grantedBy: *id011
         grantedAt: *id004
-        revokedBy: *id005
-        revokedAt: *id006
+        revokedBy: *id011
+        revokedAt: *id012
         reason:
           type:
           - string
@@ -2269,7 +2755,7 @@ components:
           type:
           - string
           - 'null'
-        authenticatedAt: *id006
+        authenticatedAt: *id012
         grants:
           type: array
           items:
@@ -2289,7 +2775,7 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/ScopeElement'
-              validUntil: *id006
+              validUntil: *id012
     AuditEvent:
       type: object
       required:
@@ -2305,7 +2791,7 @@ components:
         seq:
           type: integer
         occurredAt: *id004
-        actorIdentityId: *id005
+        actorIdentityId: *id011
         actorType:
           type: string
           enum:
@@ -2323,7 +2809,7 @@ components:
           type:
           - string
           - 'null'
-        targetId: *id005
+        targetId: *id011
         source:
           type:
           - string
@@ -2346,7 +2832,7 @@ components:
           type:
           - string
           - 'null'
-        providerInstanceId: *id005
+        providerInstanceId: *id011
         details:
           type: object
           additionalProperties:
@@ -2473,10 +2959,10 @@ components:
           - CONFIDENTIAL
           - RESTRICTED
         ownerOrgUnitId: *id003
-        ownerIdentityId: *id005
-        technicalOwnerIdentityId: *id005
-        businessOwnerIdentityId: *id005
-        locationId: *id005
+        ownerIdentityId: *id011
+        technicalOwnerIdentityId: *id011
+        businessOwnerIdentityId: *id011
+        locationId: *id011
         tags:
           type: array
           maxItems: 50
@@ -2547,14 +3033,14 @@ components:
         ownerOrgUnitId:
           type: string
           format: uuid
-        ownerIdentityId: &id007
+        ownerIdentityId: &id013
           type:
           - string
           - 'null'
           format: uuid
-        technicalOwnerIdentityId: *id007
-        businessOwnerIdentityId: *id007
-        locationId: *id007
+        technicalOwnerIdentityId: *id013
+        businessOwnerIdentityId: *id013
+        locationId: *id013
         tags:
           type: array
           maxItems: 50
@@ -2660,7 +3146,7 @@ components:
           - CLOSED
           - OPEN
           - HALF_OPEN
-        lastHealthAt: *id006
+        lastHealthAt: *id012
         failureReason:
           type:
           - string
@@ -2684,3 +3170,298 @@ components:
           - 'null'
         limit:
           type: integer
+    AccountType:
+      type: string
+      enum:
+      - HUMAN
+      - SERVICE
+      - SYSTEM
+      - SHARED
+      - EMERGENCY
+      - UNKNOWN
+    AccountGovernanceState:
+      type: string
+      enum:
+      - DISCOVERED
+      - GOVERNED
+      - MANAGED
+      - EXCLUDED
+      - REMOVED
+    AccountNativeStatus:
+      type: string
+      enum:
+      - ENABLED
+      - DISABLED
+      - LOCKED
+      - EXPIRED
+      - UNKNOWN
+      - ABSENT
+    AccountFindingType:
+      type: string
+      enum:
+      - ORPHAN
+      - UNMANAGED
+      - DORMANT
+      - UNEXPECTED
+      - PRIVILEGED_WITHOUT_OWNER
+      - DISABLED_IDENTITY_ACTIVE_ACCOUNT
+    FindingSeverity:
+      type: string
+      enum:
+      - LOW
+      - MEDIUM
+      - HIGH
+      - CRITICAL
+    Account:
+      type: object
+      description: Account on a target. Never contains credential material.
+      required:
+      - id
+      - targetId
+      - providerInstanceId
+      - nativeId
+      - name
+      - type
+      - privileged
+      - governanceState
+      - nativeStatus
+      - source
+      - openFindings
+      - version
+      properties:
+        id: *id014
+        targetId: *id014
+        targetName:
+          type: string
+        providerInstanceId: *id014
+        providerType:
+          type: string
+        nativeId:
+          type: string
+        name:
+          type: string
+        displayName:
+          type:
+          - string
+          - 'null'
+        type:
+          $ref: '#/components/schemas/AccountType'
+        privileged:
+          type: boolean
+        privilegeReason:
+          type:
+          - string
+          - 'null'
+        ownerIdentityId: &id015
+          type:
+          - string
+          - 'null'
+          format: uuid
+        linkedIdentityId: *id015
+        governanceState:
+          $ref: '#/components/schemas/AccountGovernanceState'
+        nativeStatus:
+          $ref: '#/components/schemas/AccountNativeStatus'
+        source:
+          type: string
+          enum:
+          - DISCOVERY
+          - PLATFORM
+          - IMPORT
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+        lastSeenAt: &id016
+          type:
+          - string
+          - 'null'
+          format: date-time
+        lastLoginAt: *id016
+        passwordLastSetAt: *id016
+        openFindings:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccountFindingType'
+        version:
+          type: integer
+          format: int64
+    AccountPage:
+      type: object
+      required:
+      - items
+      - limit
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Account'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+        limit:
+          type: integer
+    AccountGovernanceChange:
+      type: object
+      properties:
+        type:
+          $ref: '#/components/schemas/AccountType'
+        ownerIdentityId: *id015
+        linkedIdentityId: *id015
+        governanceState:
+          description: MANAGED is set by credential onboarding and REMOVED by discovery; both are rejected here.
+          allOf:
+          - $ref: '#/components/schemas/AccountGovernanceState'
+        reason:
+          type:
+          - string
+          - 'null'
+          maxLength: 500
+    AccountFinding:
+      type: object
+      required:
+      - id
+      - accountId
+      - targetId
+      - type
+      - severity
+      - detectedAt
+      properties:
+        id: *id014
+        accountId: *id014
+        accountName:
+          type: string
+        targetId: *id014
+        targetName:
+          type: string
+        type:
+          $ref: '#/components/schemas/AccountFindingType'
+        severity:
+          $ref: '#/components/schemas/FindingSeverity'
+        detectedAt:
+          type: string
+          format: date-time
+        resolvedAt: *id016
+        resolution:
+          type:
+          - string
+          - 'null'
+        details:
+          type: object
+          additionalProperties:
+            type: string
+    AccountFindingPage:
+      type: object
+      required:
+      - items
+      - limit
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccountFinding'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+        limit:
+          type: integer
+    FindingResolution:
+      type: object
+      required:
+      - resolution
+      properties:
+        resolution:
+          type: string
+          minLength: 1
+          maxLength: 500
+    DiscoveryRun:
+      type: object
+      required:
+      - id
+      - providerInstanceId
+      - targetId
+      - status
+      - startedAt
+      properties:
+        id: *id014
+        providerInstanceId: *id014
+        targetId: *id014
+        operationId: *id015
+        status:
+          type: string
+          enum:
+          - RUNNING
+          - COMPLETED
+          - FAILED
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt: *id016
+        accountsSeen:
+          type: integer
+        accountsNew:
+          type: integer
+        accountsRemoved:
+          type: integer
+        groupsSeen:
+          type: integer
+        errorMessage:
+          type:
+          - string
+          - 'null'
+    ProviderBinding:
+      type: object
+      required:
+      - targetId
+      - providerInstanceId
+      - providerType
+      - channel
+      properties:
+        targetId: *id017
+        providerInstanceId: *id017
+        providerType:
+          type: string
+        providerName:
+          type: string
+        channel:
+          type: string
+    BindProvider:
+      type: object
+      required:
+      - providerInstanceId
+      properties:
+        providerInstanceId: *id017
+        channel:
+          type:
+          - string
+          - 'null'
+          pattern: ^[a-z][a-z-]{1,31}$
+          description: 'Default: accounts'
+    StartDiscovery:
+      type: object
+      required:
+      - providerInstanceId
+      properties:
+        providerInstanceId: *id017
+    OperationSubmitted:
+      type: object
+      required:
+      - operationId
+      description: Poll GET /api/v1/operations/{operationId} for progress.
+      properties:
+        operationId: *id017
+        discoveryRunId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+    OperationReason:
+      type: object
+      properties:
+        reason:
+          type:
+          - string
+          - 'null'
+          maxLength: 500

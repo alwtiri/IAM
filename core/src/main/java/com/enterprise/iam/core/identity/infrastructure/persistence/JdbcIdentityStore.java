@@ -164,6 +164,11 @@ public class JdbcIdentityStore implements IdentityStore {
     }
 
     @Override
+    public Optional<UUID> identityIdByUsername(String username) {
+        return jdbc.sql("SELECT id FROM identity.identity WHERE username = :u").param("u", username).query(UUID.class).optional();
+    }
+
+    @Override
     public List<Scoped<Identity>> listIdentities(ScopeFilter filter, UUID personId, String state, PageRequest page) {
         Map<String, Object> params = new HashMap<>();
         StringBuilder sql = new StringBuilder(IDENTITY_SELECT).append(" WHERE i.type <> 'SYSTEM' AND ")
