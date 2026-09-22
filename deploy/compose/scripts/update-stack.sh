@@ -37,6 +37,11 @@ done
 echo "== Rebuild and restart"
 docker compose up -d --build iam-core iam-worker iam-web
 docker compose restart iam-proxy >/dev/null
+if [ -n "$(docker compose --profile lab ps -q lab-postgres 2>/dev/null)" ]; then
+  # lab databases created before the PostgreSQL 16 ADMIN grant was added to the init script
+  docker compose --profile lab exec -T lab-postgres sh -c 'psql -q -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "GRANT readers, alice, bob, app_writer, old_contractor TO iam_service WITH ADMIN TRUE, INHERIT FALSE, SET FALSE"' >/dev/null 2>&1 \
+    && echo "  lab-postgres: iam_service holds ADMIN on the lab roles" || true
+fi
 
 echo "== Waiting for health"
 for svc in iam-core iam-worker iam-web; do

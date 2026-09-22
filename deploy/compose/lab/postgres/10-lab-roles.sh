@@ -9,4 +9,6 @@ CREATE ROLE alice LOGIN IN ROLE readers;
 CREATE ROLE bob LOGIN;
 CREATE ROLE app_writer LOGIN IN ROLE pg_write_all_data;
 CREATE ROLE old_contractor NOLOGIN;
+-- PostgreSQL 16: CREATEROLE only manages roles it holds ADMIN on; no inheritance, no SET ROLE
+GRANT readers, alice, bob, app_writer, old_contractor TO iam_service WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
 SQL

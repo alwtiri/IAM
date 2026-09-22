@@ -69,7 +69,7 @@ public final class WindowsProvider implements Provider {
             .capability(CapabilityDescriptor.unsupported(Capability.ACCOUNT_CREATE, "provisioning follows with request fulfilment (Phase 4)"))
             .capability(CapabilityDescriptor.unsupported(Capability.ACCOUNT_DELETE, "deletion is not implemented in provider version " + VERSION))
             .capability(CapabilityDescriptor.unsupported(Capability.PASSWORD_RESET, "password operations follow with credential management"))
-            .capability(CapabilityDescriptor.unsupported(Capability.PASSWORD_ROTATION, "password operations follow with credential management"))
+            .capability(CapabilityDescriptor.supported(Capability.PASSWORD_ROTATION, VerificationMode.READ_BACK))
             .capability(CapabilityDescriptor.unsupported(Capability.GROUP_DISCOVERY, "group memberships are reported per account"))
             .build();
 
@@ -99,6 +99,7 @@ public final class WindowsProvider implements Provider {
     static final String SUMMARY = "ConvertTo-Json -Compress -InputObject @{accounts=@(Get-LocalUser).Count;groups=@(Get-LocalGroup).Count}";
     static final String DISABLE = "Disable-LocalUser -SID $p.sid";
     static final String ENABLE = "Enable-LocalUser -SID $p.sid";
+    static final String ROTATE = "Set-LocalUser -SID $p.sid -Password (ConvertTo-SecureString $p.password -AsPlainText -Force)";
     static final String UNLOCK = "$n=(Get-LocalUser -SID $p.sid).Name; $a=[ADSI](\"WinNT://./\"+$n+\",user\"); $a.IsAccountLocked=$false; $a.SetInfo()";
 
     private final ProviderConnection connection;
@@ -229,6 +230,53 @@ public final class WindowsProvider implements Provider {
     @Override
     public OperationResult<AccountState> unlockAccount(OperationContext ctx, AccountRef account) {
         return change(ctx, account, ProviderOperation.UNLOCK_ACCOUNT, UNLOCK, s -> !"true".equals(s.attributes().get("locked")), "not locked out");
+    }
+
+    /**
+     * Sets a new password generated and vaulted by the Core (LAPS-style rotation, including the built-in Administrator).
+     * The password travels base64-encoded in the HTTPS body, never in the script text; verification reads PasswordLastSet.
+     */
+    @Override
+    public OperationResult<Void> rotatePassword(OperationContext ctx, com.enterprise.iam.provider.spi.model.PasswordChange change) {
+        ProviderOperation op = ProviderOperation.ROTATE_PASSWORD;
+        if (!validRef(change.account())) {
+            return OperationResult.failed(op, invalidName());
+        }
+        return call(ctx, op, r -> {
+            Read before = read(r, change.account());
+            if (before.error() != null) {
+                return OperationResult.failed(op, before.error());
+            }
+            if (before.state().account().name().equalsIgnoreCase(accountName(serviceAccount))) {
+                return OperationResult.failed(op, new ProviderError("PROTECTED_ACCOUNT",
+                        "the platform's own service account is not rotated through account operations", false, false));
+            }
+            String sid = before.state().account().nativeId();
+            Instant started = clock.instant();
+            Secret pw;
+            try {
+                pw = ctx.credentials().redeem(change.newSecret());
+            } catch (CredentialResolver.SecretsUnavailableException e) {
+                return OperationResult.secretsUnavailable(op);
+            }
+            WinRmTransport.Result res;
+            try (pw) {
+                char[] value = pw.reveal(); // provider credential use: new password in the encrypted request body only
+                String params = Json.write(Map.of("sid", sid, "password", new String(value)));
+                java.util.Arrays.fill(value, '\0');
+                res = r.run(ROTATE, params);
+            }
+            if (!res.ok()) {
+                return OperationResult.failed(op, scriptError(res, false));
+            }
+            Read after = read(r, new AccountRef(sid, before.state().account().name()));
+            Instant set = after.state() == null ? null : after.state().passwordLastSet();
+            if (set == null || set.isBefore(started.minusSeconds(120))) {
+                return OperationResult.unknown(op, "PasswordLastSet did not change");
+            }
+            return OperationResult.succeeded(op, null, new Verification(VerificationMode.READ_BACK, clock.instant(),
+                    "PasswordLastSet of " + before.state().account().name() + " reads back " + set));
+        });
     }
 
     private OperationResult<AccountState> change(OperationContext ctx, AccountRef account, ProviderOperation op, String script,

@@ -9,7 +9,7 @@ One Gradle project per provider type (`providers/<type>`), plain Java libraries 
 
 1. Create a service account on the server (key authentication only) and give it least-privilege sudo for exactly the
    commands the provider runs (see `deploy/compose/lab/linux/sudoers-svc-iam`):
-   `svc-iam ALL=(root) NOPASSWD: /usr/bin/true, /usr/bin/passwd -S *, /usr/bin/chage -l *, /usr/sbin/usermod, /usr/sbin/faillock`
+   `svc-iam ALL=(root) NOPASSWD: /usr/bin/true, /usr/bin/passwd -S *, /usr/bin/chage -l *, /usr/sbin/usermod, /usr/sbin/faillock, /usr/sbin/chpasswd`
 2. Read the host key fingerprint from the server itself (not over the network):
    `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256` → `SHA256:...`.
    If the connection test reports "server presented <type> SHA256:...", the server negotiated another key type; verify

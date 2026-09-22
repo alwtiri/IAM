@@ -41,6 +41,8 @@ class WindowsProviderTest {
             final String sid;
             boolean enabled = true;
             boolean locked;
+            String password;
+            String passwordLastSet = "2026-01-01T00:00:00.0000000Z";
             final List<Map<String, Object>> groups = new ArrayList<>();
 
             User(String name, int rid) {
@@ -77,7 +79,7 @@ class WindowsProviderTest {
             m.put("locked", u.locked);
             m.put("fullName", u.name.equals("alice") ? "Alice Admin" : "");
             m.put("lastLogon", "2026-09-20T08:00:00.0000000Z");
-            m.put("passwordLastSet", "2026-01-01T00:00:00.0000000Z");
+            m.put("passwordLastSet", u.passwordLastSet);
             m.put("passwordExpires", u.name.equals("alice") ? "2027-01-01T00:00:00.0000000Z" : null);
             m.put("accountExpires", null);
             m.put("groups", u.groups);
@@ -115,6 +117,9 @@ class WindowsProviderTest {
                     u.enabled = true;
                 } else if (script.equals(WindowsProvider.UNLOCK)) {
                     u.locked = false;
+                } else if (script.equals(WindowsProvider.ROTATE)) {
+                    u.password = String.valueOf(p.get("password"));
+                    u.passwordLastSet = NOW.toString();
                 }
             }
             return new Result(0, "", "");
@@ -164,6 +169,21 @@ class WindowsProviderTest {
         assertEquals(NativeAccountStatus.LOCKED, provider.getAccountState(ctx(), new AccountRef(null, "alice")).value().orElseThrow().status());
         assertEquals(OperationOutcome.SUCCEEDED, provider.unlockAccount(ctx(), new AccountRef(null, "alice")).outcome());
         assertFalse(host.users.get("alice").locked);
+    }
+
+    @Test
+    void rotationSetsTheVaultedPasswordAndVerifiesPasswordLastSet() {
+        OperationContext ctx = new OperationContext(UUID.randomUUID(), "key-12345678", "corr-12345678", 1, NOW.plusSeconds(60),
+                h -> Secret.of(h.value().equals("ch_new") ? "Rot@ted-123456" : "P@ss"));
+        var r = provider.rotatePassword(ctx, new com.enterprise.iam.provider.spi.model.PasswordChange(new AccountRef(null, "Administrator"), null,
+                new CredentialHandle("ch_new")));
+        assertEquals(OperationOutcome.SUCCEEDED, r.outcome(), r.toString());
+        assertEquals("Rot@ted-123456", host.users.get("Administrator").password);
+        assertEquals("PROTECTED_ACCOUNT", provider.rotatePassword(ctx, new com.enterprise.iam.provider.spi.model.PasswordChange(
+                new AccountRef(null, "svc-iam"), null, new CredentialHandle("ch_new"))).error().orElseThrow().code());
+        host.ignoreChanges = true;
+        assertEquals(OperationOutcome.UNKNOWN, provider.rotatePassword(ctx, new com.enterprise.iam.provider.spi.model.PasswordChange(
+                new AccountRef(null, "alice"), null, new CredentialHandle("ch_new"))).outcome());
     }
 
     @Test

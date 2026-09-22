@@ -18,6 +18,7 @@ import com.enterprise.iam.provider.spi.model.DiscoverySummary;
 import com.enterprise.iam.provider.spi.model.GroupRef;
 import com.enterprise.iam.provider.spi.model.NativeAccountStatus;
 import com.enterprise.iam.provider.spi.model.Page;
+import com.enterprise.iam.provider.spi.model.PasswordChange;
 import com.enterprise.iam.provider.spi.result.OperationResult;
 import com.enterprise.iam.provider.spi.result.ProviderError;
 import com.enterprise.iam.provider.spi.result.Verification;
@@ -64,7 +65,7 @@ public final class LinuxProvider implements Provider {
             .capability(CapabilityDescriptor.unsupported(Capability.ACCOUNT_CREATE, "provisioning follows with request fulfilment (Phase 4)"))
             .capability(CapabilityDescriptor.unsupported(Capability.ACCOUNT_DELETE, "deletion is not implemented in provider version " + VERSION))
             .capability(CapabilityDescriptor.unsupported(Capability.PASSWORD_RESET, "password operations follow with credential management"))
-            .capability(CapabilityDescriptor.unsupported(Capability.PASSWORD_ROTATION, "password operations follow with credential management"))
+            .capability(CapabilityDescriptor.supported(Capability.PASSWORD_ROTATION, VerificationMode.READ_BACK))
             .capability(CapabilityDescriptor.unsupported(Capability.GROUP_DISCOVERY, "group memberships are reported per account"))
             .build();
 
@@ -232,6 +233,57 @@ public final class LinuxProvider implements Provider {
             }
             return OperationResult.succeeded(ProviderOperation.UNLOCK_ACCOUNT, after.state(),
                     new Verification(VerificationMode.READ_BACK, Instant.now(), "failure counter for " + account.name() + " reads back as 0"));
+        });
+    }
+
+    /**
+     * Sets a new password generated and vaulted by the Core. The password travels on stdin to {@code chpasswd} (never on
+     * a command line); verification reads the "last password change" date back.
+     */
+    @Override
+    public OperationResult<Void> rotatePassword(OperationContext ctx, PasswordChange change) {
+        ProviderOperation op = ProviderOperation.ROTATE_PASSWORD;
+        String name = change.account().name();
+        String q = quotedUser(name);
+        if (q == null) {
+            return invalidName(op);
+        }
+        if (name.equals(username)) {
+            return OperationResult.failed(op, new ProviderError("PROTECTED_ACCOUNT", "the platform's own service account is rotated by the platform credential process only", false, false));
+        }
+        return session(ctx, op, t -> {
+            Read before = read(t, name);
+            if (before.error() != null) {
+                return OperationResult.failed(op, before.error());
+            }
+            Secret pw;
+            try {
+                pw = ctx.credentials().redeem(change.newSecret());
+            } catch (CredentialResolver.SecretsUnavailableException e) {
+                return OperationResult.secretsUnavailable(op);
+            }
+            SshTransport.Exec r;
+            try (pw) {
+                char[] value = pw.reveal(); // provider credential use: new password to chpasswd stdin only, cleared below
+                byte[] line = (name + ":" + new String(value) + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                java.util.Arrays.fill(value, '\0');
+                try {
+                    r = t.exec(sudoPrefix() + "chpasswd", line, timeout);
+                } finally {
+                    java.util.Arrays.fill(line, (byte) 0);
+                }
+            }
+            if (!r.ok()) {
+                return OperationResult.failed(op, new ProviderError("PROVIDER_REJECTED", "chpasswd failed with exit code " + r.exitCode(), false, false));
+            }
+            SshTransport.Exec check = t.exec(sudoPrefix() + "chage -l " + q + " | sed -n 's/^Last password change[^:]*:[[:space:]]*//p'", null, timeout);
+            java.time.Instant changed = LinuxParsers.accountExpiry(check.stdout().trim());
+            java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+            if (changed == null || java.time.LocalDate.ofInstant(changed, java.time.ZoneOffset.UTC).isBefore(today.minusDays(1))) {
+                return OperationResult.unknown(op, "password change date reads back as '" + check.stdout().trim() + "'");
+            }
+            return OperationResult.succeeded(op, null, new Verification(VerificationMode.READ_BACK, Instant.now(),
+                    "last password change of " + name + " reads back " + check.stdout().trim()));
         });
     }
 

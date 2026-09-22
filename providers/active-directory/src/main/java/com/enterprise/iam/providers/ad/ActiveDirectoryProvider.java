@@ -81,7 +81,7 @@ public final class ActiveDirectoryProvider implements Provider, AutoCloseable {
             .capability(CapabilityDescriptor.unsupported(Capability.ACCOUNT_CREATE, "provisioning follows with request fulfilment (Phase 4)"))
             .capability(CapabilityDescriptor.unsupported(Capability.ACCOUNT_DELETE, "deletion is not implemented in provider version " + VERSION))
             .capability(CapabilityDescriptor.unsupported(Capability.PASSWORD_RESET, "password operations follow with credential management"))
-            .capability(CapabilityDescriptor.unsupported(Capability.PASSWORD_ROTATION, "password operations follow with credential management"))
+            .capability(CapabilityDescriptor.supported(Capability.PASSWORD_ROTATION, VerificationMode.READ_BACK))
             .capability(CapabilityDescriptor.unsupported(Capability.GROUP_DISCOVERY, "group memberships are reported per account"))
             .build();
 
@@ -252,6 +252,55 @@ public final class ActiveDirectoryProvider implements Provider, AutoCloseable {
         return change(ctx, account, ProviderOperation.UNLOCK_ACCOUNT,
                 r -> r.lockedOut() || AdValues.parseFlags(r.entry().first("lockoutTime")) != 0 ? new String[] {"lockoutTime", "0"} : null,
                 r -> !r.lockedOut(), "not locked out");
+    }
+
+    /**
+     * Sets a vaulted password through {@code unicodePwd} (quoted UTF-16LE), which AD accepts only over an encrypted
+     * connection; verification reads {@code pwdLastSet} back.
+     */
+    @Override
+    public OperationResult<Void> rotatePassword(OperationContext ctx, com.enterprise.iam.provider.spi.model.PasswordChange change) {
+        ProviderOperation op = ProviderOperation.ROTATE_PASSWORD;
+        if (config.security() == LdapDirectoryFactory.Security.PLAIN) {
+            return OperationResult.unsupported(op, "Active Directory accepts password changes only over LDAPS or StartTLS");
+        }
+        return withDirectory(ctx, op, d -> {
+            Read before = read(d, change.account());
+            if (before.error() != null) {
+                return OperationResult.failed(op, before.error());
+            }
+            if ("krbtgt".equalsIgnoreCase(before.entry().first("sAMAccountName"))) {
+                return OperationResult.failed(op, new ProviderError("PROTECTED_ACCOUNT", "the krbtgt account is managed by the domain", false, false));
+            }
+            long beforeSet = AdValues.parseFlags(before.entry().first("pwdLastSet"));
+            Secret pw;
+            try {
+                pw = ctx.credentials().redeem(change.newSecret());
+            } catch (CredentialResolver.SecretsUnavailableException e) {
+                return OperationResult.secretsUnavailable(op);
+            }
+            try (pw) {
+                char[] value = pw.reveal(); // provider credential use: unicodePwd value only, cleared below
+                byte[] encoded = ("\"" + new String(value) + "\"").getBytes(java.nio.charset.StandardCharsets.UTF_16LE);
+                Arrays.fill(value, '\0');
+                try {
+                    d.replaceBinary(before.entry().dn(), "unicodePwd", encoded);
+                } catch (LdapDirectory.RejectedException e) {
+                    String code = "insufficientAccessRights".equalsIgnoreCase(e.resultCode()) ? "PRIVILEGE_MISSING"
+                            : "constraintViolation".equalsIgnoreCase(e.resultCode()) ? "PASSWORD_POLICY" : "PROVIDER_REJECTED";
+                    return OperationResult.failed(op, new ProviderError(code, "directory rejected the password: " + e.resultCode(), false, false));
+                } finally {
+                    Arrays.fill(encoded, (byte) 0);
+                }
+            }
+            Read after = read(d, new AccountRef(before.state().account().nativeId(), before.state().account().name()));
+            long afterSet = after.error() == null ? AdValues.parseFlags(after.entry().first("pwdLastSet")) : 0;
+            if (afterSet <= beforeSet) {
+                return OperationResult.unknown(op, "pwdLastSet did not change");
+            }
+            return OperationResult.succeeded(op, null, new Verification(VerificationMode.READ_BACK, clock.instant(),
+                    "pwdLastSet of " + after.state().account().name() + " reads back " + AdValues.fileTime(String.valueOf(afterSet))));
+        });
     }
 
     private OperationResult<AccountState> change(OperationContext ctx, AccountRef account, ProviderOperation op,

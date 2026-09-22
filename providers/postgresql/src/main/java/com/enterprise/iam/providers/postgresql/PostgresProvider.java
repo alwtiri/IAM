@@ -18,6 +18,7 @@ import com.enterprise.iam.provider.spi.model.DiscoverySummary;
 import com.enterprise.iam.provider.spi.model.GroupRef;
 import com.enterprise.iam.provider.spi.model.NativeAccountStatus;
 import com.enterprise.iam.provider.spi.model.Page;
+import com.enterprise.iam.provider.spi.model.PasswordChange;
 import com.enterprise.iam.provider.spi.result.OperationResult;
 import com.enterprise.iam.provider.spi.result.ProviderError;
 import com.enterprise.iam.provider.spi.result.Verification;
@@ -72,6 +73,8 @@ public final class PostgresProvider implements Provider {
                    (SELECT rolcreaterole FROM pg_roles WHERE rolname = current_user) AS create_role""";
     static final String COUNT_SQL = "SELECT count(*) FILTER (WHERE rolcanlogin) AS logins, count(*) AS roles FROM pg_roles WHERE rolname !~ '^pg_'";
     static final String FORMAT_SQL = "SELECT format(?, ?) AS stmt";
+    static final String FORMAT2_SQL = "SELECT format(?, ?, ?) AS stmt";
+    static final int SCRAM_ITERATIONS = 4096;
 
     static final ProviderDescriptor DESCRIPTOR = ProviderDescriptor.builder(TYPE, VERSION)
             .capability(CapabilityDescriptor.supported(Capability.CONNECTION_VALIDATION, null))
@@ -83,7 +86,7 @@ public final class PostgresProvider implements Provider {
             .capability(CapabilityDescriptor.unsupported(Capability.ACCOUNT_CREATE, "provisioning follows with request fulfilment"))
             .capability(CapabilityDescriptor.unsupported(Capability.ACCOUNT_DELETE, "deletion is not implemented in provider version " + VERSION))
             .capability(CapabilityDescriptor.unsupported(Capability.PASSWORD_RESET, "password operations follow with credential management"))
-            .capability(CapabilityDescriptor.unsupported(Capability.PASSWORD_ROTATION, "password operations follow with credential management"))
+            .capability(CapabilityDescriptor.supported(Capability.PASSWORD_ROTATION, VerificationMode.LOGIN_TEST))
             .capability(CapabilityDescriptor.unsupported(Capability.GROUP_DISCOVERY, "group roles are reported as memberships per account"))
             .build();
 
@@ -222,6 +225,66 @@ public final class PostgresProvider implements Provider {
             }
             return OperationResult.succeeded(op, state(after), new Verification(VerificationMode.READ_BACK, clock.instant(),
                     "role " + name + " reads back " + (login ? "LOGIN" : "NOLOGIN")));
+        });
+    }
+
+    /**
+     * Rotates a role's password. The platform computes a SCRAM-SHA-256 verifier locally, so neither the password nor
+     * anything reversible reaches the server or its statement log; the change is verified by logging in as the role with
+     * the new password (LOGIN_TEST). Roles that cannot log in cannot be verified and end UNKNOWN.
+     */
+    @Override
+    public OperationResult<Void> rotatePassword(OperationContext ctx, PasswordChange change) {
+        ProviderOperation op = ProviderOperation.ROTATE_PASSWORD;
+        if (!validName(change.account())) {
+            return OperationResult.failed(op, new ProviderError("INVALID_ACCOUNT_NAME", "not a valid role name or oid", false, false));
+        }
+        return call(ctx, op, db -> {
+            Map<String, Object> before = read(db, change.account());
+            if (before == null) {
+                return OperationResult.failed(op, notFound(change.account()));
+            }
+            String name = String.valueOf(before.get("name"));
+            if (name.equals(target.username()) || (Boolean.TRUE.equals(before.get("superuser")) && !allowSuperuserChanges)) {
+                return OperationResult.failed(op, new ProviderError("PROTECTED_ACCOUNT",
+                        "the service role and superusers are not rotated here (allowSuperuserChanges=true to manage superusers)", false, false));
+            }
+            Secret pw;
+            try {
+                pw = ctx.credentials().redeem(change.newSecret());
+            } catch (CredentialResolver.SecretsUnavailableException e) {
+                return OperationResult.secretsUnavailable(op);
+            }
+            try (pw) {
+                String verifier;
+                char[] value = pw.reveal(); // provider credential use: SCRAM verifier derivation and login test only, cleared below
+                try {
+                    verifier = Scram.verifier(value, SCRAM_ITERATIONS);
+                } finally {
+                    Arrays.fill(value, '\0');
+                }
+                String stmt = String.valueOf(db.query(FORMAT2_SQL, "ALTER ROLE %I PASSWORD %L", name, verifier).get(0).get("stmt"));
+                try {
+                    db.execute(stmt);
+                } catch (DbSession.StatementException e) {
+                    String code = "42501".equals(e.sqlState()) ? "PRIVILEGE_MISSING" : "PROVIDER_REJECTED";
+                    return OperationResult.failed(op, new ProviderError(code, "PostgreSQL refused the password change (SQLState " + e.sqlState() + ")", false, false));
+                }
+                if (!Boolean.TRUE.equals(before.get("can_login"))) {
+                    return OperationResult.unknown(op, "password set, but role " + name + " cannot log in, so it cannot be verified");
+                }
+                DbSessions.Target asRole = new DbSessions.Target(target.host(), target.port(), target.database(), name, target.sslMode(),
+                        target.caCertificatePem(), target.timeout());
+                try (DbSession probe = sessions.open(asRole, pw)) {
+                    probe.query(VALIDATE_SQL);
+                } catch (DbSession.AuthenticationException e) {
+                    return OperationResult.unknown(op, "login test with the new password was rejected (pg_hba may not allow this role from the worker)");
+                } catch (IOException e) {
+                    return OperationResult.unknown(op, "login test could not be completed: " + e.getMessage());
+                }
+            }
+            return OperationResult.succeeded(op, null, new Verification(VerificationMode.LOGIN_TEST, clock.instant(),
+                    "role " + name + " logged in with the new password"));
         });
     }
 

@@ -36,6 +36,9 @@ class PostgresProviderTest {
         boolean serviceCanCreateRoles = true;
         String refuse;
         String denyState;
+        final Map<String, String> verifiers = new LinkedHashMap<>();
+        final List<String> logins = new ArrayList<>();
+        boolean loginWorks = true;
 
         FakeDb() {
             role("postgres", 10, true, true, List.of());
@@ -74,6 +77,12 @@ class PostgresProviderTest {
                 throw new DbSession.AuthenticationException("login rejected for " + target.username());
             }
             assertEquals("verify-full", target.sslMode());
+            if (!target.username().equals("iam_service")) {
+                logins.add(target.username() + "/" + new String(password.reveal()));
+                if (!loginWorks) {
+                    throw new DbSession.AuthenticationException("login rejected for " + target.username());
+                }
+            }
             return new DbSession() {
                 @Override
                 public List<Map<String, Object>> query(String sql, Object... params) {
@@ -98,6 +107,10 @@ class PostgresProviderTest {
                         String ident = name.matches("[a-z_][a-z0-9_]*") ? name : "\"" + name.replace("\"", "\"\"") + "\"";
                         return List.of(Map.of("stmt", String.valueOf(params[0]).replace("%I", ident)));
                     }
+                    if (sql.equals(PostgresProvider.FORMAT2_SQL)) {
+                        String name = String.valueOf(params[1]);
+                        return List.of(Map.of("stmt", String.valueOf(params[0]).replace("%I", name).replace("%L", "'" + params[2] + "'")));
+                    }
                     throw new AssertionError("unexpected SQL " + sql);
                 }
 
@@ -106,6 +119,11 @@ class PostgresProviderTest {
                     statements.add(statement);
                     if (denyState != null) {
                         throw new DbSession.StatementException(denyState, "denied");
+                    }
+                    if (statement.contains(" PASSWORD ")) {
+                        String[] parts = statement.split(" ");
+                        verifiers.put(parts[2], parts[4]);
+                        return;
                     }
                     String ident = statement.substring("ALTER ROLE ".length(), statement.lastIndexOf(' '));
                     String name = ident.startsWith("\"") ? ident.substring(1, ident.length() - 1).replace("\"\"", "\"") : ident;
@@ -123,6 +141,35 @@ class PostgresProviderTest {
         Map<String, String> s = new LinkedHashMap<>(Map.of("username", "iam_service"));
         s.putAll(extra);
         return new ProviderConnection(UUID.randomUUID(), PostgresProvider.TYPE, "postgresql://db01.example.org:5432/app", s, new CredentialHandle("ch_pg"));
+    }
+
+    @Test
+    void scramVerifierMatchesTheReferenceDerivation() {
+        byte[] salt = new byte[16];
+        for (int i = 0; i < 16; i++) {
+            salt[i] = (byte) i;
+        }
+        assertEquals("SCRAM-SHA-256$4096:AAECAwQFBgcICQoLDA0ODw==$zHCdol2044/ZyWzPLi7oxApCkamKw9Z+E4U/QApd/5Y=:dd5peBOitVnLNFu7VmwP+HiDaaw4OUCv396eVCWhYiE=",
+                Scram.verifier("pencil".toCharArray(), salt, 4096));
+    }
+
+    @Test
+    void rotationSendsOnlyAVerifierAndVerifiesByLoggingIn() {
+        OperationContext c = new OperationContext(UUID.randomUUID(), "key-12345678", "corr-12345678", 1, NOW.plusSeconds(60),
+                h -> Secret.of(h.value().equals("ch_new") ? "N3w-Secret!" : "pw"));
+        var r = provider.rotatePassword(c, new com.enterprise.iam.provider.spi.model.PasswordChange(new AccountRef(null, "alice"), null,
+                new CredentialHandle("ch_new")));
+        assertEquals(OperationOutcome.SUCCEEDED, r.outcome(), r.toString());
+        assertTrue(db.verifiers.get("alice").startsWith("'SCRAM-SHA-256$4096:"));
+        assertTrue(db.statements.stream().noneMatch(x -> x.contains("N3w-Secret!")), "the password never appears in SQL");
+        assertEquals(List.of("alice/N3w-Secret!"), db.logins);
+        db.loginWorks = false;
+        assertEquals(OperationOutcome.UNKNOWN, provider.rotatePassword(c, new com.enterprise.iam.provider.spi.model.PasswordChange(
+                new AccountRef(null, "alice"), null, new CredentialHandle("ch_new"))).outcome());
+        assertEquals(OperationOutcome.UNKNOWN, provider.rotatePassword(c, new com.enterprise.iam.provider.spi.model.PasswordChange(
+                new AccountRef(null, "bob_old"), null, new CredentialHandle("ch_new"))).outcome(), "NOLOGIN cannot be verified");
+        assertEquals("PROTECTED_ACCOUNT", provider.rotatePassword(c, new com.enterprise.iam.provider.spi.model.PasswordChange(
+                new AccountRef(null, "postgres"), null, new CredentialHandle("ch_new"))).error().orElseThrow().code());
     }
 
     static OperationContext ctx() {

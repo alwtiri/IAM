@@ -85,6 +85,11 @@ public interface LdapDirectory extends AutoCloseable {
     /** Replaces all values of one attribute with a single value. */
     void replace(String dn, String attribute, String value) throws IOException;
 
+    /** Replaces an attribute with one binary value (e.g. {@code unicodePwd}). */
+    default void replaceBinary(String dn, String attribute, byte[] value) throws IOException {
+        throw new RejectedException("unwillingToPerform", "binary modifications are not supported by this directory client");
+    }
+
     @Override
     void close();
 }
