@@ -236,6 +236,12 @@ public class JdbcIdentityStore implements IdentityStore {
     }
 
     @Override
+    public Optional<String> subjectOf(UUID identityId) {
+        return jdbc.sql("SELECT keycloak_subject FROM identity.platform_user WHERE identity_id = :id").param("id", identityId)
+                .query(String.class).optional();
+    }
+
+    @Override
     public void insertPlatformUser(UUID identityId, String subject, Instant now) {
         jdbc.sql("INSERT INTO identity.platform_user (identity_id, keycloak_subject, created_at) VALUES (:id, :sub, :now)")
                 .param("id", identityId).param("sub", subject).param("now", ts(now)).update();

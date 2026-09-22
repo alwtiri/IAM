@@ -843,6 +843,56 @@ paths:
           $ref: '#/components/responses/Error'
         '204':
           description: No content
+  /api/v1/identities/{id}:create-login:
+    post:
+      tags:
+      - identities
+      operationId: createLogin
+      summary: Create the Keycloak login for the identity, link it and send the invitation (set password + enrol MFA)
+      x-iam-phase: 3
+      x-iam-permission: identity:platform-user
+      x-iam-step-up: true
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - *id001
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: Login created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [subject, invitationSent]
+                properties:
+                  subject: { type: string }
+                  invitationSent: { type: boolean }
+  /api/v1/identities/{id}:resend-invitation:
+    post:
+      tags:
+      - identities
+      operationId: resendLoginInvitation
+      summary: Send the login invitation again
+      x-iam-phase: 3
+      x-iam-permission: identity:platform-user
+      x-iam-step-up: true
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - *id001
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '204':
+          description: No content
   /api/v1/permissions:
     get:
       tags:

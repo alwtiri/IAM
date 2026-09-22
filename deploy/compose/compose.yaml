@@ -95,6 +95,8 @@ services:
         target: spring.rabbitmq.password
       - source: keycloak_client_secret
         target: iam.auth.client-secret
+      - source: keycloak_admin_client_secret
+        target: iam.auth.admin-client-secret
       - source: vault_role_id
         target: vault_role_id
       - source: vault_secret_id
@@ -221,6 +223,7 @@ services:
         export KC_DB_PASSWORD="$$(cat /run/secrets/keycloak_db_password)"
         KC_BOOTSTRAP_ADMIN_PASSWORD="$$(cat /run/secrets/keycloak_admin_password)"
         IAM_CLIENT_SECRET="$$(cat /run/secrets/keycloak_client_secret)"
+        IAM_ADMIN_CLIENT_SECRET="$$(cat /run/secrets/keycloak_admin_client_secret)"
         IAM_ADMIN_INITIAL_PASSWORD="$$(cat /run/secrets/iam_admin_initial_password)"
         IAM_PUBLIC_URL="${IAM_PUBLIC_URL:-http://localhost:8088}" &&
         exec /opt/keycloak/bin/kc.sh start-dev --import-realm
@@ -233,7 +236,7 @@ services:
       KC_PROXY_HEADERS: xforwarded
       KC_HOSTNAME: ${IAM_PUBLIC_URL:-http://localhost:8088}/auth
       KC_HEALTH_ENABLED: "true"
-    secrets: [keycloak_db_password, keycloak_admin_password, keycloak_client_secret, iam_admin_initial_password]
+    secrets: [keycloak_db_password, keycloak_admin_password, keycloak_client_secret, keycloak_admin_client_secret, iam_admin_initial_password]
     volumes:
       - ./keycloak/realm-iam-dev.json:/opt/keycloak/data/import/realm-iam-dev.json:ro
     depends_on:
@@ -338,6 +341,7 @@ secrets:
   rabbitmq_password:       { file: ./secrets/rabbitmq_password }
   cache_password:          { file: ./secrets/cache_password }
   keycloak_client_secret:  { file: ./secrets/keycloak_client_secret }
+  keycloak_admin_client_secret: { file: ./secrets/keycloak_admin_client_secret }
   iam_admin_initial_password: { file: ./secrets/iam_admin_initial_password }
   vault_role_id:           { file: ./secrets/vault_role_id }
   vault_secret_id:         { file: ./secrets/vault_secret_id }

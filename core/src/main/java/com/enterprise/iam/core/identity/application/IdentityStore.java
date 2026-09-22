@@ -54,6 +54,9 @@ public interface IdentityStore {
 
     boolean hasPlatformUser(UUID identityId);
 
+    /** Keycloak subject linked to the identity, if any. */
+    Optional<String> subjectOf(UUID identityId);
+
     void insertPlatformUser(UUID identityId, String subject, Instant now);
 
     void touchLogin(UUID identityId, Instant now);

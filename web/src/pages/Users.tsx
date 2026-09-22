@@ -138,7 +138,7 @@ function AddUserDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
             <TextField required fullWidth label={t.givenName} value={form.givenName} onChange={set('givenName')} />
             <TextField required fullWidth label={t.familyName} value={form.familyName} onChange={set('familyName')} />
           </Stack>
-          <TextField label={t.email} type="email" value={form.email} onChange={set('email')} />
+          <TextField label={t.email} type="email" value={form.email} onChange={set('email')} helperText={t.emailForLogin} />
           <TextField select required label={t.orgUnit} value={form.orgUnitId} onChange={set('orgUnitId')}>
             {units.map((u) => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
           </TextField>
@@ -171,6 +171,36 @@ function UserDetail({ identity: initial, onBack }: { identity: Identity; onBack:
   const [prompt, setPrompt] = useState<{ title: string; run: (reason: string) => Promise<void> }>();
   const [granting, setGranting] = useState(false);
   const [linking, setLinking] = useState(false);
+  const [notice, setNotice] = useState<{ severity: 'success' | 'warning'; text: string }>();
+  const [loginBusy, setLoginBusy] = useState(false);
+
+  const createLogin = async () => {
+    setLoginBusy(true);
+    setNotice(undefined);
+    try {
+      const r = await apiFetch<{ subject: string; invitationSent: boolean }>(`/api/v1/identities/${identity.id}:create-login`, { method: 'POST' });
+      setNotice(r.invitationSent ? { severity: 'success', text: t.loginCreated } : { severity: 'warning', text: t.loginCreatedNoMail });
+      setError(undefined);
+      await load();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setLoginBusy(false);
+    }
+  };
+
+  const resend = async () => {
+    setLoginBusy(true);
+    try {
+      await apiFetch(`/api/v1/identities/${identity.id}:resend-invitation`, { method: 'POST' });
+      setNotice({ severity: 'success', text: t.invitationSent });
+      setError(undefined);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setLoginBusy(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -210,6 +240,7 @@ function UserDetail({ identity: initial, onBack }: { identity: Identity; onBack:
         <Typography color="text.secondary">{identity.username} · {identity.type}</Typography>
       </Box>
       {error !== undefined && <ErrorAlert error={error} />}
+      {notice && <Alert severity={notice.severity}>{notice.text}</Alert>}
 
       <Card><CardContent>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -219,7 +250,11 @@ function UserDetail({ identity: initial, onBack }: { identity: Identity; onBack:
           {(s === 'ACTIVE' || s === 'SUSPENDED' || s === 'PENDING') && <Button variant="outlined" color="error" onClick={() => transition('disable', t.disableIdentity)}>{t.disableIdentity}</Button>}
           <Box sx={{ flexGrow: 1 }} />
           <Chip variant="outlined" color={identity.platformUser ? 'success' : 'default'} label={`${t.loginAccount}: ${identity.platformUser ? t.linked : t.notLinked}`} />
-          {!identity.platformUser && <Button onClick={() => setLinking(true)}>{t.linkLogin}</Button>}
+          {!identity.platformUser && s === 'ACTIVE' && (
+            <Button variant="contained" color="secondary" disabled={loginBusy} onClick={() => void createLogin()}>{t.createLogin}</Button>
+          )}
+          {!identity.platformUser && <Button size="small" onClick={() => setLinking(true)}>{t.linkLogin}</Button>}
+          {identity.platformUser && <Button size="small" disabled={loginBusy} onClick={() => void resend()}>{t.resendInvitation}</Button>}
         </Stack>
       </CardContent></Card>
 

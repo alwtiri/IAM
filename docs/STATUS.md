@@ -3,13 +3,13 @@
 Last updated: 2026-09-22 (Phase 3). "Works in the UI" means an administrator can do it end to end in the web app without
 curl. Everything below is also available through the REST API.
 
-## Works in the UI (after applying bundle phase-3-part7)
+## Works in the UI (after applying bundle phase-3-part9)
 
 | Feature | What the administrator can do | How to verify |
 |---|---|---|
 | Sign-in with MFA | Keycloak login, step-up (password + TOTP) for sensitive actions | Log in; register a provider (asks for step-up) |
 | Dashboard | Live KPIs (servers, accounts, privileged accounts, open findings, identities, operations needing attention), recent operations, findings by type, platform health | Open `/` |
-| User administration | Add a user (person + identity, optional immediate activation), search, activate / suspend / reinstate / disable with reason, grant and revoke roles (global or org-unit scope), link the Keycloak login | Identity & Access → Users |
+| User administration | Add a user (person + identity, optional immediate activation), search, activate / suspend / reinstate / disable with reason, grant and revoke roles (global or org-unit scope), create the Keycloak login with an e-mail invitation (set password + enrol MFA), resend the invitation; suspending/disabling an identity also blocks its Keycloak login | Identity & Access → Users |
 | Server management (Linux) | Add a server, add an SSH connection (key stored in Vault only, host key pinned), test connection, discover accounts, see privileged accounts and findings, disable / enable / unlock / refresh an account with read-back verification and an audit reason | Assets → Servers; or `deploy/compose/scripts/smoke-phase3.sh` against the lab server |
 | Accounts views | All, privileged, Linux, Windows accounts with the same actions | Accounts → … |
 | Audit | Tamper-evident audit log of every change | Audit & Compliance → Audit Logs |
@@ -19,7 +19,6 @@ curl. Everything below is also available through the REST API.
 
 | Feature | What is missing | Planned |
 |---|---|---|
-| Creating the Keycloak login for a new user | The platform links an existing Keycloak user; it does not yet create the Keycloak account and send the invitation | Next increment (Keycloak admin API from Core) |
 | Windows servers | Active Directory provider is implemented (LDAPS); WinRM (local Windows accounts) is not | 3.7 |
 | Org-unit management screen | API exists; UI uses the list only | With user administration polish |
 | Container image CVE gate | Report-only until Phase 9 (ADR-0019) | Phase 9 |

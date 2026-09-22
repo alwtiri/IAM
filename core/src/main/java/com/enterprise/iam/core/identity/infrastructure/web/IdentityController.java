@@ -4,6 +4,7 @@ import com.enterprise.iam.core.identity.api.IdentityView;
 import com.enterprise.iam.core.identity.api.PersonView;
 import com.enterprise.iam.core.identity.application.IdentityService;
 import com.enterprise.iam.core.identity.application.PersonService;
+import com.enterprise.iam.core.identity.application.PlatformLoginService;
 import com.enterprise.iam.core.identity.domain.IdentityState;
 import com.enterprise.iam.core.identity.domain.IdentityType;
 import com.enterprise.iam.core.identity.domain.Person;
@@ -59,11 +60,13 @@ class IdentityController {
 
     private final PersonService persons;
     private final IdentityService identities;
+    private final PlatformLoginService logins;
     private final CurrentActorProvider actors;
 
-    IdentityController(PersonService persons, IdentityService identities, CurrentActorProvider actors) {
+    IdentityController(PersonService persons, IdentityService identities, PlatformLoginService logins, CurrentActorProvider actors) {
         this.persons = persons;
         this.identities = identities;
+        this.logins = logins;
         this.actors = actors;
     }
 
@@ -140,6 +143,21 @@ class IdentityController {
     @RequiresStepUp
     IdentityView disable(@PathVariable UUID id, @Valid @RequestBody ReasonRequest r) {
         return identities.transition(actors.require(), id, IdentityState.DISABLED, r.reason());
+    }
+
+    @PostMapping("/identities/{id}:create-login")
+    @RequiresPermission(Permissions.IDENTITY_PLATFORM_USER)
+    @RequiresStepUp
+    PlatformLoginService.Provisioned createLogin(@PathVariable UUID id) {
+        return logins.provision(actors.require(), id);
+    }
+
+    @PostMapping("/identities/{id}:resend-invitation")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @RequiresPermission(Permissions.IDENTITY_PLATFORM_USER)
+    @RequiresStepUp
+    void resendInvitation(@PathVariable UUID id) {
+        logins.resendInvitation(actors.require(), id);
     }
 
     @PutMapping("/identities/{id}/platform-user")

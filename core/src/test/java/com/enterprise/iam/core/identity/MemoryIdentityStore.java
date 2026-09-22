@@ -142,6 +142,11 @@ final class MemoryIdentityStore implements IdentityStore {
     }
 
     @Override
+    public Optional<String> subjectOf(UUID identityId) {
+        return subjects.entrySet().stream().filter(e -> e.getValue().equals(identityId)).map(Map.Entry::getKey).findFirst();
+    }
+
+    @Override
     public void insertPlatformUser(UUID identityId, String subject, Instant now) {
         Objects.requireNonNull(subject);
         subjects.put(subject, identityId);
