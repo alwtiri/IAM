@@ -148,6 +148,13 @@ public class IdentityService implements IdentityDirectory {
         return username == null || username.isBlank() ? Optional.empty() : store.identityIdByUsername(username).flatMap(store::summary);
     }
 
+    @Override
+    public Optional<UUID> managerIdentityOf(UUID identityId) {
+        return tx.readOnly(() -> store.findIdentity(identityId)
+                .flatMap(i -> store.managerOf(i.value().personId()))
+                .flatMap(store::activeIdentityOfPerson));
+    }
+
     static IdentityView view(Identity i, String displayName, boolean platformUser) {
         return new IdentityView(i.id(), i.personId(), displayName, i.type().name(), i.username(), i.state().name(), i.stateReason(),
                 i.validFrom(), i.validUntil(), platformUser, i.version());

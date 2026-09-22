@@ -17,12 +17,12 @@ export const NAVIGATION: NavItem[] = [
   {
     id: 'identityAccess', path: '/identity', phase: 2, children: [
       leaf('users', '/identity/users', 2, 'identity:read'),
-      leaf('groups', '/identity/groups', 3),
+      leaf('groups', '/identity/groups', 5),
       leaf('roles', '/identity/roles', 2, 'role:read'),
       leaf('accessPolicies', '/identity/policies', 4),
       leaf('accessRequests', '/identity/requests', 4),
       leaf('approvals', '/identity/approvals', 4),
-      leaf('entitlements', '/identity/entitlements', 3),
+      leaf('entitlements', '/identity/entitlements', 5),
       leaf('directory', '/identity/directory', 3),
       leaf('serviceAccounts', '/identity/service-accounts', 3),
     ],
@@ -34,7 +34,7 @@ export const NAVIGATION: NavItem[] = [
       leaf('virtualization', '/assets/virtualization', 5),
       leaf('storage', '/assets/storage', 5),
       leaf('networkDevices', '/assets/network', 5),
-      leaf('applications', '/assets/applications', 3),
+      leaf('applications', '/assets/applications', 5),
       leaf('databases', '/assets/databases', 5),
     ],
   },
@@ -45,13 +45,13 @@ export const NAVIGATION: NavItem[] = [
       leaf('windowsAccounts', '/accounts/windows', 3),
       leaf('serviceAccountsList', '/accounts/service', 3),
       leaf('privilegedAccounts', '/accounts/privileged', 3),
-      leaf('emergencyAccounts', '/accounts/emergency', 4),
+      leaf('emergencyAccounts', '/accounts/emergency', 6),
     ],
   },
   {
     id: 'privilegedAccess', path: '/pam', phase: 6, children: [
-      leaf('pamRequests', '/pam/requests', 4),
-      leaf('pamApprovals', '/pam/approvals', 4),
+      leaf('pamRequests', '/pam/requests', 6),
+      leaf('pamApprovals', '/pam/approvals', 6),
       leaf('privilegedSessions', '/pam/sessions', 6),
       leaf('sshAccess', '/pam/ssh', 6),
       leaf('rdpAccess', '/pam/rdp', 6),
@@ -66,12 +66,12 @@ export const NAVIGATION: NavItem[] = [
     ],
   },
   {
-    id: 'emergency', path: '/emergency', phase: 4, children: [
-      leaf('emergencyAccountsList', '/emergency/accounts', 4),
-      leaf('emergencyRequests', '/emergency/requests', 4),
-      leaf('emergencyApprovals', '/emergency/approvals', 4),
+    id: 'emergency', path: '/emergency', phase: 6, children: [
+      leaf('emergencyAccountsList', '/emergency/accounts', 6),
+      leaf('emergencyRequests', '/emergency/requests', 6),
+      leaf('emergencyApprovals', '/emergency/approvals', 6),
       leaf('activeEmergencies', '/emergency/active', 6),
-      leaf('emergencyAudit', '/emergency/audit', 4),
+      leaf('emergencyAudit', '/emergency/audit', 6),
     ],
   },
   {
@@ -98,7 +98,7 @@ export const NAVIGATION: NavItem[] = [
   },
 ];
 
-export const CURRENT_PHASE = 3;
+export const CURRENT_PHASE = 4;
 
 export function flatten(items: NavItem[] = NAVIGATION): NavItem[] {
   return items.flatMap((i) => [i, ...(i.children ? flatten(i.children) : [])]);

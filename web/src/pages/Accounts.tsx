@@ -134,3 +134,9 @@ export function WindowsAccountsPage() {
   return <AccountsTable query="?limit=100" title={t.nav.windowsAccounts}
     filter={(a) => a.providerType === 'windows-winrm' || a.providerType === 'active-directory'} />;
 }
+
+export function ServiceAccountsPage() {
+  const { t } = useLocale();
+  return <AccountsTable query="?limit=200" title={t.nav.serviceAccountsList}
+    filter={(a) => a.type === 'SERVICE' || a.attributes.servicePrincipalNames !== undefined || a.attributes.interactiveLogin === 'false'} />;
+}

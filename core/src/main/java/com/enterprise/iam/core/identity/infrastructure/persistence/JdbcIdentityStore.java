@@ -101,6 +101,12 @@ public class JdbcIdentityStore implements IdentityStore {
     }
 
     @Override
+    public Optional<UUID> activeIdentityOfPerson(UUID personId) {
+        return jdbc.sql("SELECT id FROM identity.identity WHERE person_id = :p AND state = 'ACTIVE' ORDER BY valid_from, id LIMIT 1")
+                .param("p", personId).query(UUID.class).optional();
+    }
+
+    @Override
     public boolean employeeIdExists(String employeeId, UUID exceptPersonId) {
         return jdbc.sql("SELECT count(*) FROM identity.person WHERE employee_id = :emp AND id <> :id")
                 .param("emp", employeeId).param("id", exceptPersonId).query(Long.class).single() > 0;

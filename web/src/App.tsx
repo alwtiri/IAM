@@ -11,11 +11,12 @@ import { flatten, isAvailable, type NavItem } from './navigation';
 import { AuditPage, HealthPage, PlannedPage, ProvidersPage, RolesPage, TargetsPage } from './pages/Pages';
 import { UsersPage } from './pages/Users';
 import { OrgUnitsPage } from './pages/OrgUnits';
+import { AccessRequestsPage, ApprovalsPage, PoliciesPage } from './pages/Requests';
 import { DashboardPage } from './pages/Dashboard';
 import { MeContext } from './MeContext';
 import { ErrorAlert } from './pages/common';
 import { ServersPage } from './pages/Servers';
-import { AllAccountsPage, LinuxAccountsPage, PrivilegedAccountsPage, WindowsAccountsPage } from './pages/Accounts';
+import { AllAccountsPage, LinuxAccountsPage, PrivilegedAccountsPage, ServiceAccountsPage, WindowsAccountsPage } from './pages/Accounts';
 
 const PAGES: Record<string, () => React.JSX.Element> = {
   dashboard: DashboardPage,
@@ -28,6 +29,12 @@ const PAGES: Record<string, () => React.JSX.Element> = {
   providerManagement: ProvidersPage,
   servers: ServersPage,
   directory: OrgUnitsPage,
+  accessRequests: AccessRequestsPage,
+  approvals: ApprovalsPage,
+  accessPolicies: PoliciesPage,
+  policies: PoliciesPage,
+  serviceAccountsList: ServiceAccountsPage,
+  serviceAccounts: ServiceAccountsPage,
   allAccounts: AllAccountsPage,
   privilegedAccounts: PrivilegedAccountsPage,
   linuxAccounts: LinuxAccountsPage,

@@ -54,7 +54,7 @@ export function DashboardPage() {
   const displayName = useMe()?.displayName;
   const [data, setData] = useState<{
     linux?: Page<Target>; windows?: Page<Target>; accounts?: Page<Account>; privileged?: Page<Account>;
-    findings?: Page<AccountFinding>; identities?: Page<Identity>; operations?: Page<Operation>; health?: SystemHealth; loaded: boolean;
+    findings?: Page<AccountFinding>; identities?: Page<Identity>; operations?: Page<Operation>; health?: SystemHealth; approvals?: unknown[]; loaded: boolean;
   }>({ loaded: false });
 
   useEffect(() => {
@@ -67,8 +67,9 @@ export function DashboardPage() {
       tryFetch<Page<Identity>>('/api/v1/identities?limit=200'),
       tryFetch<Page<Operation>>('/api/v1/operations?limit=12'),
       tryFetch<SystemHealth>('/api/v1/system/health'),
-    ]).then(([linux, windows, accounts, privileged, findings, identities, operations, health]) =>
-      setData({ linux, windows, accounts, privileged, findings, identities, operations, health, loaded: true }));
+      tryFetch<unknown[]>('/api/v1/approvals'),
+    ]).then(([linux, windows, accounts, privileged, findings, identities, operations, health, approvals]) =>
+      setData({ linux, windows, accounts, privileged, findings, identities, operations, health, approvals, loaded: true }));
   }, []);
 
   const servers = data.linux || data.windows
@@ -87,12 +88,13 @@ export function DashboardPage() {
         <Typography color="text.secondary">{t.dashboardSubtitle}</Typography>
       </Box>
 
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(6, 1fr)' } }}>
+      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
         <Kpi label={t.kpiServers} value={show(servers)} accent="#4f46e5" />
         <Kpi label={t.kpiAccounts} value={show(countLabel(data.accounts))} accent="#0ea5e9" />
         <Kpi label={t.kpiPrivileged} value={show(countLabel(data.privileged))} accent="#d97706" />
         <Kpi label={t.kpiFindings} value={show(countLabel(data.findings))} accent="#dc2626" />
         <Kpi label={t.kpiUsers} value={show(countLabel(data.identities))} accent="#16a34a" />
+        <Kpi label={t.kpiPendingApprovals} value={show(data.approvals ? String(data.approvals.length) : undefined)} accent="#0891b2" />
         <Kpi label={t.kpiOperations} value={show(attention === undefined ? undefined : String(attention))} accent="#7c3aed" />
       </Box>
 

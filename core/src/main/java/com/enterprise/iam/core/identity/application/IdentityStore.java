@@ -48,6 +48,9 @@ public interface IdentityStore {
 
     Optional<IdentitySummary> summary(UUID identityId);
 
+    /** Oldest ACTIVE identity of a person (manager resolution). */
+    Optional<UUID> activeIdentityOfPerson(UUID personId);
+
     Optional<PlatformUserRef> findBySubject(String subject);
 
     boolean subjectExists(String subject);

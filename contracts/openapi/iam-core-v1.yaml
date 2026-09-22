@@ -46,6 +46,8 @@ tags:
   description: Provider instances (spec §11)
 - name: accounts
   description: Account Management Core (spec §12–§14, G8)
+- name: requests
+  description: Access requests, approvals, policies and SoD (spec §20–§24)
 paths:
   /api/v1/system/info:
     get:
@@ -893,6 +895,308 @@ paths:
           $ref: '#/components/responses/Error'
         '204':
           description: No content
+  /api/v1/policies:
+    get:
+      tags:
+      - requests
+      operationId: listPolicies
+      summary: Access policies (deny-overrides, ADR-0013)
+      x-iam-phase: 4
+      x-iam-permission: policy:read
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/policies/{id}:enable:
+    post:
+      tags:
+      - requests
+      operationId: enablePolicy
+      summary: Enable a policy
+      x-iam-phase: 4
+      x-iam-permission: policy:write
+      x-iam-step-up: true
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/policies/{id}:disable:
+    post:
+      tags:
+      - requests
+      operationId: disablePolicy
+      summary: Disable a policy
+      x-iam-phase: 4
+      x-iam-permission: policy:write
+      x-iam-step-up: true
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/sod-rules:
+    get:
+      tags:
+      - requests
+      operationId: listSodRules
+      summary: Separation-of-duties rules
+      x-iam-phase: 4
+      x-iam-permission: sod:read
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/access-requests/requestable-roles:
+    get:
+      tags:
+      - requests
+      operationId: listRequestableRoles
+      summary: Roles the signed-in identity can request, with the approvals policy will require
+      x-iam-phase: 4
+      x-iam-permission: authenticated
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/access-requests:
+    get:
+      tags:
+      - requests
+      operationId: listAccessRequests
+      summary: Own requests (mine=true) or all requests (mine=false, needs request:read)
+      x-iam-phase: 4
+      x-iam-permission: authenticated
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+    post:
+      tags:
+      - requests
+      operationId: submitAccessRequest
+      summary: Request a time-bound role (policy + SoD evaluated at submission)
+      x-iam-phase: 4
+      x-iam-permission: authenticated
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/access-requests/{id}:
+    get:
+      tags:
+      - requests
+      operationId: getAccessRequest
+      summary: One access request
+      x-iam-phase: 4
+      x-iam-permission: authenticated
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/access-requests/{id}:cancel:
+    post:
+      tags:
+      - requests
+      operationId: cancelAccessRequest
+      summary: Cancel an own pending request
+      x-iam-phase: 4
+      x-iam-permission: authenticated
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/access-requests/{id}:approve:
+    post:
+      tags:
+      - requests
+      operationId: approveAccessRequest
+      summary: Approve the current step (eligible approver, recent MFA)
+      x-iam-phase: 4
+      x-iam-permission: authenticated
+      x-iam-step-up: true
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/access-requests/{id}:reject:
+    post:
+      tags:
+      - requests
+      operationId: rejectAccessRequest
+      summary: Reject with a reason
+      x-iam-phase: 4
+      x-iam-permission: authenticated
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/approvals:
+    get:
+      tags:
+      - requests
+      operationId: listMyApprovals
+      summary: Requests waiting for the signed-in approver
+      x-iam-phase: 4
+      x-iam-permission: authenticated
+      parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
   /api/v1/permissions:
     get:
       tags:
